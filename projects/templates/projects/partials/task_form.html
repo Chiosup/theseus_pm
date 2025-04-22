@@ -1,0 +1,47 @@
+
+{% block content %}
+<h2>{% if task %}Редактировать задачу "{{ task.title }}"{% else %}Создать новую задачу{% endif %}</h2>
+
+<form method="post" id="taskForm">
+    {% csrf_token %}
+    
+    <label for="id_title">Название:</label>
+    {{ form.title }}
+
+    <label for="id_description">Описание:</label>
+    {{ form.description }}
+
+    <label for="id_start_date">Дата начала:</label>
+    {{ form.start_date }}
+
+    <label for="id_end_date">Дата окончания:</label>
+    {{ form.end_date }}
+
+    <label for="id_due_date">Срок выполнения:</label>
+    {{ form.due_date }}
+
+    <label for="id_status">Статус:</label>
+    {{ form.status }}
+
+    <label for="id_priority">Приоритет:</label>
+    {{ form.priority }}
+
+    <label for="id_assigned_to">Исполнители:</label>
+    {{ form.assigned_to }}
+
+    <label for="id_previous_task">Предыдущая задача:</label>
+    {{ form.previous_task }}
+
+    <div class="mt-3 d-flex justify-content-end gap-2">
+        <button type="submit" class="btn btn-primary">Создать</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    </div>
+</form>
+
+<script>
+    // Синхронизация due_date
+    document.getElementById("id_end_date").addEventListener("change", function() {
+        document.getElementById("id_due_date").value = this.value;
+    });
+</script>
+{% endblock %}

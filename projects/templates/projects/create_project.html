@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <h2>Создать проект</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-custom">Создать</button>
+    </form>
+    <a href="{% url 'project_list' %}" class="btn btn-secondary">Назад</a>
+
+    <style>
+        form {
+            max-width: 400px;
+            margin: auto;
+        }
+        .btn-secondary { background: #6c757d; color: #fff; }
+    </style>
+{% endblock %}

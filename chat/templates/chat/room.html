@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="chat-container">
+    <h2>{{ room.get_display_name }}</h2>
+    
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="message {% if message.sender == request.user %}my-message{% else %}other-message{% endif %}">
+            <div class="message-header">
+                <strong>{{ message.sender.get_full_name }}</strong>
+                <small>{{ message.timestamp|date:"d.m.Y H:i" }}</small>
+            </div>
+            <div class="message-content">{{ message.content }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form method="POST" class="message-form">
+        {% csrf_token %}
+        <div class="input-group">
+            <input type="text" name="content" class="form-control" placeholder="Введите сообщение..." required>
+            <button type="submit" class="btn btn-custom">Отправить</button>
+        </div>
+    </form>
+</div>
+<script src="{% static 'js/chat.js' %}"></script>
+{% endblock %}

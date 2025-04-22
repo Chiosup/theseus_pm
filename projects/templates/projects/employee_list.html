@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">Загруженность сотрудников</h2>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="employeeTable" style="border-collapse: separate; border-spacing: 0;">
+            <thead class="thead-dark">
+                <tr>
+                    <th style="width: 20%; border: 1px solid #dee2e6;">Сотрудник</th>
+                    <th style="width: 20%; border: 1px solid #dee2e6;" class="text-center">Нагрузка</th>
+                    <th style="width: 20%; border: 1px solid #dee2e6;" class="text-center">Статусы задач</th>
+                    <th style="width: 15%; border: 1px solid #dee2e6;" class="text-center">Просрочки</th>
+                    <th style="width: 25%; border: 1px solid #dee2e6;" class="text-center">Проекты</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for data in employee_data %}
+                <tr style="border: 1px solid #dee2e6;">
+                    <!-- Колонка сотрудника -->
+                    <td style="border: 1px solid #dee2e6;">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle bg-primary mr-3">
+                                {{ data.employee.get_full_name|default:data.employee.username|first }}
+                            </div>
+                            <div>
+                                <div class="font-weight-bold">
+                                    {{ data.employee.get_full_name|default:data.employee.username }}
+                                </div>
+                                <div class="small text-muted">
+                                    {{ data.employee.get_role_display|default:"-" }}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+
+      <!-- Колонка нагрузки -->
+<td style="border: 1px solid #dee2e6;" class="align-middle">
+    <div class="workload-container">
+        {% if data.task_counts.total > 0 %}
+            {% with progress=data.progress %}
+            <div class="progress-thick">
+                <div class="progress-bar 
+                    {% if progress < 40 %}bg-success
+                    {% elif progress < 80 %}bg-warning
+                    {% else %}bg-danger{% endif %}" 
+                    style="width: {{ progress }}%;">
+                    <span class="progress-text">{{ progress|floatformat:"0" }}%</span>
+                </div>
+            </div>
+            <div class="workload-details mt-1 small">
+                <div>Всего задач: {{ data.task_counts.total }}</div>
+                <div>В работе: {{ data.task_counts.in_progress }}</div>
+            </div>
+            {% endwith %}
+        {% else %}
+            <div class="progress-thick">
+                <div class="progress-bar bg-secondary" style="width: 100%;">
+                    <span class="progress-text">Нет задач</span>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</td>
+
+                    <!-- Колонка статусов -->
+                    <td style="border: 1px solid #dee2e6;" class="align-middle">
+                        <div class="status-container">
+                            <div class="status-item">
+                                <span class="badge badge-secondary">{{ data.task_counts.new }}</span>
+                                <span class="status-label">Новые</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="badge badge-warning">{{ data.task_counts.in_progress }}</span>
+                                <span class="status-label">В работе</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="badge badge-success">{{ data.task_counts.done }}</span>
+                                <span class="status-label">Завершены</span>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Колонка просрочек -->
+                    <td style="border: 1px solid #dee2e6;" class="align-middle text-center">
+                        {% if data.task_counts.overdue %}
+                        <div class="overdue-badge">
+                            <span class="badge badge-pill badge-danger" style="font-size: 1rem;">{{ data.task_counts.overdue }}</span>
+                            <div class="overdue-label">просрочено</div>
+                        </div>
+                        {% else %}
+                        <span class="text-success">Нет</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Колонка проектов -->
+                    <td style="border: 1px solid #dee2e6;" class="align-middle">
+                        <div class="projects-container">
+                            {% for project in data.projects %}
+                            <div class="project-item">
+                                <span class="badge badge-info">{{ project.title }}</span>
+                            </div>
+                            {% empty %}
+                            <span class="text-muted">Нет проектов</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    /* Основные стили */
+    .avatar-circle {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgb(0, 0, 0);
+        font-weight: bold;
+        font-size: 18px;
+    }
+    
+    /* Таблица */
+    .table-bordered {
+        border: 1px solid #dee2e6;
+    }
+    
+    .table-bordered th,
+    .table-bordered td {
+        border: 1px solid #dee2e6;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+    
+/* Прогресс-бар */
+.progress-thick {
+    height: 24px;
+    background-color: #f0f0f0;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: width 0.3s ease;
+}
+
+/* Явное указание цветов */
+.progress-bar.bg-success { background-color: #28a745; }
+.progress-bar.bg-warning { background-color: #ffc107; }
+.progress-bar.bg-danger { background-color: #dc3545; }
+.progress-bar.bg-secondary { background-color: #6c757d; }
+
+.progress-text {
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+    position: relative;
+}
+    .workload-details {
+        font-size: 12px;
+        color: #6c757d;
+        text-align: center;
+    }
+    
+    /* Статусы задач */
+    .status-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .status-label {
+        font-size: 13px;
+        color: #495057;
+    }
+    .badge-secondary {
+    color: #fff !important;       /* Белый текст */
+    background-color: #6c757d !important; /* Серый фон */
+    border: 1px solid #5a6268 !important; /* Темная граница */
+}
+.badge-warning {
+    color: #ffffff !important;    /* Темный текст */
+    background-color: #ffc107 !important; /* Желтый фон */
+    border: 1px solid #d39e00 !important; /* Темно-желтая граница */
+}
+
+.badge-success {
+    color: #ffffff !important;    /* Темный текст */
+    background-color: #08a31d !important; /* Желтый фон */
+    border: 1px solid #07ff2856 !important; /* Темно-желтая граница */
+}
+.badge-pill {
+    border-radius: 50rem;
+}
+
+.badge-danger {
+    color: white !important;
+    background-color: #dc3545 !important;
+    border-color: #bd2130 !important;
+}
+
+.badge-info {
+    color: white !important;
+    background-color: #17a2b8 !important;
+    border-color: #117a8b !important;
+}
+    /* Просрочки */
+    .overdue-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+    
+    .overdue-label {
+        font-size: 12px;
+        color: #dc3545;
+    }
+    
+    /* Проекты */
+    .projects-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+</style>
+
+<script>
+$(document).ready(function() {
+    // Инициализация DataTable
+    if ($.fn.DataTable) {
+        $('#employeeTable').DataTable({
+            "order": [[3, "desc"]],
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Russian.json"
+            },
+            "pageLength": 25,
+            "responsive": true
+        });
+    }
+});
+</script>
+{% endblock %}
