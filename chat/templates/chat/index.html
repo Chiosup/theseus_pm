@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% load chat_tags %}
 {% block content %}
 <div class="chat-app">
     <!-- Сайдбар с чатами -->
@@ -39,12 +39,12 @@
         
         <div class="chat-list">
             {% for chat in chats %}
-            <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }}, '{{ chat.get_display_name|escapejs }}')">
+            <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat('{{ chat.id }}', '{{ chat|chat_display_name:current_user|escapejs }}')">
                 <div class="avatar-circle">
                     <i class="fas fa-user-circle"></i>
                 </div>
                 <div class="chat-info">
-                    <h3>{{ chat.get_display_name }}</h3>
+                    <h3>{{ chat|chat_display_name:current_user }}</h3>
                     {% if chat.last_message_content %}
                     <p class="last-message">{{ chat.last_message_content|truncatechars:30 }}</p>
                     {% endif %}
@@ -118,7 +118,7 @@
 /* Базовые стили */
 .chat-app {
     display: flex;
-    height: 90vh;
+    height: 85vh;
     font-family: 'Segoe UI', Roboto, sans-serif;
 }
 

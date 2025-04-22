@@ -8,12 +8,27 @@ from django.http import JsonResponse, HttpResponseForbidden, HttpResponseBadRequ
 from django.views.decorators.http import require_POST
 from django.db import models
 from django.utils import timezone
+from django.db.models.functions import Concat
+from django.db.models import Value
 
 @login_required
 def index(request):
     chats = ChatRoom.objects.filter(
         participants=request.user
     ).annotate(
+        display_name=models.Case(
+    models.When(type='direct', then=models.Subquery(
+        get_user_model().objects.filter(
+            chat_rooms=OuterRef('pk'),
+            is_active=True
+        ).exclude(id=request.user.id)
+        .annotate(full_name=Concat('last_name', Value(' '), 'first_name'))
+        .values('full_name')[:1]
+    )),
+    models.When(type='project', then=models.F('project__title')),
+    default=models.Value('Чат'),
+    output_field=models.CharField()
+),
         last_msg_time=Max('messages__timestamp'),
         last_message_content=Subquery(
             Message.objects.filter(room=OuterRef('pk'))
@@ -33,13 +48,12 @@ def index(request):
     ).order_by('-last_msg_time').prefetch_related('participants')
     
     User = get_user_model()
-    users = User.objects.exclude(id=request.user.id)  # Исключаем текущего пользователя
+    users = User.objects.exclude(id=request.user.id).filter(is_active=True)
     return render(request, 'chat/index.html', {
         'chats': chats,
         'users': users,
         'current_user': request.user
     })
-
 @login_required
 @require_POST
 def create_direct_chat(request):
@@ -156,7 +170,8 @@ def search_chats(request):
                 get_user_model().objects.filter(
                     chat_rooms=OuterRef('pk')
                 ).exclude(id=request.user.id)
-                .values('username')[:1]
+                .annotate(full_name=Concat('last_name', Value(' '), 'first_name'))
+                .values('full_name')[:1]
             )),
             models.When(type='project', then=models.F('project__title')),
             default=models.Value('Чат'),
@@ -187,7 +202,6 @@ def search_chats(request):
     
     return JsonResponse(list(chats), safe=False)
     
-    return JsonResponse(list(chats), safe=False)
 def room_view(request, room_id):
     room = get_object_or_404(ChatRoom, id=room_id)
     if request.user not in room.participants.all():

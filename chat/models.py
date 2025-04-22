@@ -28,15 +28,27 @@ class ChatRoom(models.Model):
     def get_last_message(self):
      return self.messages.order_by('-timestamp').first()
 
-    def get_display_name(self):
+    def get_display_name(self, current_user=None):
         if self.type == 'direct':
-            # Получаем участников чата, исключая текущего пользователя
-            other_users = self.participants.exclude(id=self.creator.id if self.creator else None)
+            other_users = self.participants.exclude(id=current_user.id) if current_user else self.participants.exclude(id=self.creator.id if self.creator else None)
             other_user = other_users.first()
-            return f"Чат с {other_user.get_full_name()}" if other_user else "Личный чат"
-        elif self.type == 'project':
-            return f"Проектный чат: {self.project.title if self.project else 'Общий'}"
+            if other_user:
+                return other_user.get_full_name() or other_user.username
+            return "Чат"
+        elif self.type == 'project' and self.project:
+            return self.project.title
         return "Чат"
+    def get_display_name_for_user(self, user):
+        if self.type == 'direct':
+            other_users = self.participants.exclude(id=user.id)
+            other_user = other_users.first()
+            if other_user:
+                return other_user.get_full_name() or other_user.username
+            return user.get_full_name() or user.username  # fallback если нет других участников
+        elif self.type == 'project' and self.project:
+            return self.project.title
+        return "Чат"
+
 
 class Message(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')

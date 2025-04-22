@@ -12,3 +12,6 @@ def get_user_chats(user):
     ).annotate(
         last_msg_time=Max('messages__timestamp')  # Теперь Max доступен
     ).order_by('-last_msg_time')[:5]  # Сортируем по времени последнего сообщения
+@register.filter
+def chat_display_name(chat, user):
+    return chat.get_display_name_for_user(user)
