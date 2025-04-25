@@ -10,19 +10,19 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Персональная информация', {'fields': ('first_name', 'last_name', 'email')}),
-        ('Роли и доступ', {'fields': ('role', 'groups', 'user_permissions', 'is_staff', 'is_active', 'is_superuser')}),  # Добавил groups
+        ('Роли и доступ', {'fields': ('role', 'groups', 'user_permissions', 'is_staff', 'is_active', 'is_superuser')}),  
         ('Даты', {'fields': ('last_login', 'date_joined')}),
     )
 
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'role', 'groups', 'is_staff', 'is_active')}  # Добавил groups
+            'fields': ('username', 'email', 'password1', 'password2', 'role', 'groups', 'is_staff', 'is_active')}  
         ),
     )
 
     search_fields = ('username', 'email')
-    filter_horizontal = ('groups', 'user_permissions')  # Оставляем
+    filter_horizontal = ('groups', 'user_permissions')  
     ordering = ('username',)
 
     def has_module_permission(self, request):

@@ -195,7 +195,7 @@ $(document).ready(function(){
     // Четкое соответствие колонок и статусов
     const statusMap = {
         'new-column': 'new',
-        'in-progress-column': 'in_progress',  // Обратите внимание на нижнее подчеркивание
+        'in-progress-column': 'in_progress',  
         'done-column': 'done'
     };
     
@@ -288,7 +288,7 @@ $(document).ready(function(){
 <!-- Подключаем Google Charts (остается без изменений) -->
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript">
-    // Ваш существующий код для диаграммы Ганта
+    
     document.addEventListener("DOMContentLoaded", function () {
         google.charts.load("current", { packages: ["gantt"] });
         google.charts.setOnLoadCallback(drawGanttChart);

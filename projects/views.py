@@ -38,7 +38,7 @@ def project_list(request):
     else:
         projects = Project.objects.filter(participants=request.user)  # Остальные видят, где участвуют
 
-    # Добавляем атрибут с количеством завершенных задач
+   
     for project in projects:
         project.completed_tasks_count = project.tasks.filter(status="completed").count()
 
@@ -79,7 +79,7 @@ def create_project(request):
             project = form.save(commit=False)
             project.creator = request.user
             project.save()
-            form.save_m2m()  # Для ManyToMany поля participants
+            form.save_m2m()  
             
             return JsonResponse({
                 'success': True,
@@ -177,8 +177,8 @@ def create_task(request, project_id):
             task = form.save(commit=False)
             task.project = project
             task.save()
-            form.save_m2m()  # Если есть ManyToMany-поля (например, assigned_to)
-            return redirect('task_detail', task_id=task.id)  # Или другой редирект
+            form.save_m2m() 
+            return redirect('task_detail', task_id=task.id)  
     else:
         form = TaskForm()
     
