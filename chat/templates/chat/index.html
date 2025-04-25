@@ -782,7 +782,7 @@ document.getElementById('chat-search').addEventListener('input', debounce(functi
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', function() {
-    // Загружаем первый чат, если есть
+    // Загружаем первый чат
     const firstChat = document.querySelector('.chat-item');
     if (firstChat) {
         const chatId = parseInt(firstChat.getAttribute('data-chat-id'));
