@@ -2,7 +2,7 @@
 {% block content %}
 <h2>Мои проекты</h2>
 
-{% if user.groups.all.0.name == "director" %}
+{% if user.role == "director" %}
     <button type="button" class="btn btn-custom" data-bs-toggle="modal" data-bs-target="#createProjectModal">
         Добавить проект
     </button>
