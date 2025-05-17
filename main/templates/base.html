@@ -41,18 +41,6 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script>
-        // Активация выпадающего меню
-        document.addEventListener('DOMContentLoaded', function() {
-            var dropdownElements = document.querySelectorAll('.dropdown-toggle');
-            dropdownElements.forEach(function(el) {
-                el.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var menu = this.nextElementSibling;
-                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                });
-            });
-        });
-    </script>
+    
 </body>
 </html>
