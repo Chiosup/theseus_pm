@@ -12,6 +12,8 @@ class CustomUser(AbstractUser):
     
     def save(self, *args, **kwargs):
         """Автоматически задаем is_staff и is_superuser в зависимости от роли"""
+        if self.is_superuser:
+            self.role = 'admin'
         if self.role in ['admin', 'director']:
             self.is_staff = True
             self.is_superuser = True  # Администраторы и руководители имеют полный доступ
