@@ -324,3 +324,65 @@ def edit_project(request, project_id):
     form = ProjectForm(instance=project)
     form_html = render_to_string('projects/project_form.html', {'form': form}, request=request)
     return JsonResponse({'form_html': form_html})
+@login_required
+def duplicate_project(request, project_id):
+    """Создание копии проекта со всеми задачами"""
+    original_project = get_object_or_404(Project, id=project_id)
+    
+    # Проверяем права на копирование
+    if not (request.user.role in ['admin', 'director', 'manager']):
+        return JsonResponse({'success': False, 'error': 'Нет прав на копирование проектов'})
+    
+    try:
+        # Создаем копию проекта
+        duplicated_project = Project.objects.create(
+            title=f"{original_project.title} (Копия)",
+            description=original_project.description,
+            start_date=original_project.start_date,
+            end_date=original_project.end_date,
+            status='active',  # Все копии становятся активными
+            version=original_project.version,
+            creator=request.user
+        )
+        
+        # Копируем участников
+        duplicated_project.participants.set(original_project.participants.all())
+        
+        # Копируем задачи
+        task_mapping = {}  # Для отслеживания связи между оригинальными и скопированными задачами
+        
+        for original_task in original_project.tasks.all():
+            duplicated_task = Task.objects.create(
+                title=original_task.title,
+                description=original_task.description,
+                due_date=original_task.due_date,
+                start_date=original_task.start_date,
+                end_date=original_task.end_date,
+                status='new',  # Все скопированные задачи становятся новыми
+                priority=original_task.priority,
+                project=duplicated_project
+            )
+            
+            # Копируем исполнителей
+            duplicated_task.assigned_to.set(original_task.assigned_to.all())
+            
+            # Сохраняем связь для обработки предыдущих задач
+            task_mapping[original_task.id] = duplicated_task
+        
+        # Обновляем связи между задачами (previous_task)
+        for original_task in original_project.tasks.all():
+            if original_task.previous_task:
+                duplicated_task = task_mapping[original_task.id]
+                duplicated_previous_task = task_mapping.get(original_task.previous_task.id)
+                if duplicated_previous_task:
+                    duplicated_task.previous_task = duplicated_previous_task
+                    duplicated_task.save()
+        
+        return JsonResponse({
+            'success': True, 
+            'message': f'Проект "{original_project.title}" успешно скопирован',
+            'new_project_id': duplicated_project.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Ошибка при копировании: {str(e)}'})

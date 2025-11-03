@@ -18,4 +18,5 @@ urlpatterns = [
     path('task/<int:task_id>/edit/', views.edit_task, name='edit_task'),
    path('tasks/<int:task_id>/delete/', views.delete_task, name='delete_task'),
    path('projects/<int:project_id>/create_task_modal/', views.create_task_modal, name='create_task_modal'),
+   path('project/<int:project_id>/duplicate/', views.duplicate_project, name='duplicate_project'),
 ]
