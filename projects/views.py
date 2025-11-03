@@ -302,3 +302,25 @@ def employee_list(request):
         'employee_data': employee_data,
         'today': timezone.now().date()
     })
+@login_required
+def edit_project(request, project_id):
+    """Редактирование проекта"""
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Проверяем права на редактирование
+    if not (request.user == project.creator or request.user.role in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'Нет прав на редактирование'})
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST, instance=project)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({'success': True})
+        else:
+            form_html = render_to_string('projects/project_form.html', {'form': form}, request=request)
+            return JsonResponse({'success': False, 'form_html': form_html})
+    
+    # GET запрос - возвращаем форму
+    form = ProjectForm(instance=project)
+    form_html = render_to_string('projects/project_form.html', {'form': form}, request=request)
+    return JsonResponse({'form_html': form_html})

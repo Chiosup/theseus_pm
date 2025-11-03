@@ -4,7 +4,7 @@ from .models import Project, Task
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['title', 'description', 'start_date', 'end_date', 'status', 'participants']
+        fields = ['title', 'description', 'start_date', 'end_date', 'status', 'participants', 'version']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -28,7 +28,19 @@ class ProjectForm(forms.ModelForm):
                 'class': 'form-control',
                 'size': 5
             }),
+          'version': forms.TextInput(attrs={  # НОВЫЙ ВИДЖЕТ
+                'class': 'form-control',
+                'placeholder': 'v1.0'
+            }),
         }
+        labels = {
+            'version': 'Версия проекта'  # Новая метка
+        }
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Устанавливаем значение по умолчанию для нового проекта
+            if not self.instance.pk:  # Если проект новый
+                self.fields['version'].initial = 'v1.0'
 
 class TaskForm(forms.ModelForm):
     class Meta:

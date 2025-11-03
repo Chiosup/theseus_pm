@@ -16,6 +16,7 @@ class Project(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Статус")
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name="created_projects", verbose_name="Создатель")
     participants = models.ManyToManyField(User, related_name="projects", verbose_name="Участники")
+    version = models.CharField(max_length=20, default='v1.0', verbose_name="Версия проекта")
     def can_create(self, user):
         return user.role == 'manager'
     def __str__(self):

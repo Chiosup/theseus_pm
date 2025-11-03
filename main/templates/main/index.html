@@ -73,7 +73,7 @@
                 .+X$XXX$Xx:.                                                                                      
                      .    
 -->
-{% if user.role == "director" %}
+{% if user.role == "manager" %}
     <button type="button" class="btn btn-custom" data-bs-toggle="modal" data-bs-target="#createProjectModal">
         Добавить проект
     </button>
@@ -84,6 +84,7 @@
         <a href="{% url 'project_detail' project.id %}" class="project-card">
             <h3>{{ project.title }}</h3>
             <p>{{ project.description }}</p>
+            <span class="project-version">{{ project.version }}
         </a>
     {% endfor %}
 </div>
