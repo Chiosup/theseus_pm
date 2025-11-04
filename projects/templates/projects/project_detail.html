@@ -384,6 +384,26 @@ document.querySelectorAll('.kanban-column').forEach(column => {
         }
     });
 });
+// Добавьте эту функцию в ваш скрипт
+function showNotification(message, type = 'success') {
+    // Создаем уведомление с помощью Bootstrap toast или alert
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Автоматически скрываем через 3 секунды
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
 
 // JavaScript для модальных окон
 $(document).ready(function(){

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Project, Task, TaskStatus, TaskPriority, ProjectStage
-from .forms import ProjectForm, TaskForm
+from .models import Project, Task, TaskStatus, TaskPriority, ProjectStage, SubTask
+from .forms import ProjectForm, TaskForm, SubTaskForm
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseForbidden
@@ -194,6 +194,54 @@ def update_task_status(request, task_id):
             task.save()
     
     return redirect('project_detail', project_id=task.project.id)
+@require_http_methods(["POST"])
+@login_required
+def complete_subtask(request, subtask_id):
+    """Завершение подзадачи"""
+    subtask = get_object_or_404(SubTask, id=subtask_id)
+    
+    # Проверяем права
+    if request.user not in subtask.assigned_to.all():
+        return JsonResponse({'success': False, 'error': 'У вас нет прав на завершение этой подзадачи'})
+    
+    # Находим статус "Завершена"
+    try:
+        done_status = TaskStatus.objects.get(name='Завершена')
+        subtask.status = done_status
+        subtask.end_date = timezone.now().date()
+        subtask.save()
+        return JsonResponse({'success': True})
+    except TaskStatus.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Статус "Завершена" не найден'})
+
+@require_http_methods(["POST"])
+@login_required
+def reopen_subtask(request, subtask_id):
+    """Переоткрытие подзадачи"""
+    subtask = get_object_or_404(SubTask, id=subtask_id)
+    
+    # Проверяем права
+    if (request.user not in subtask.assigned_to.all() and 
+        request.user.role not in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'У вас нет прав на переоткрытие этой подзадачи'})
+    
+    # Находим статус "В работе" или первый доступный статус
+    try:
+        in_progress_status = TaskStatus.objects.get(name='В работе')
+        subtask.status = in_progress_status
+        subtask.end_date = None
+        subtask.save()
+        return JsonResponse({'success': True})
+    except TaskStatus.DoesNotExist:
+        # Используем первый доступный статус
+        available_status = subtask.get_available_statuses().first()
+        if available_status:
+            subtask.status = available_status
+            subtask.end_date = None
+            subtask.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Нет доступных статусов'})
 @login_required
 def task_detail(request, task_id):
     """Детальная страница задачи"""
@@ -206,11 +254,15 @@ def task_detail(request, task_id):
         return HttpResponseForbidden("У вас нет доступа к этой задаче")
     
     # Получаем подзадачи
-    subtasks = task.subtasks.all()
+    subtasks = task.subtasks_list.all()
+    
+    # Получаем статусы для канбан-доски подзадач
+    subtask_statuses = task.get_available_statuses()
     
     context = {
         'task': task,
         'subtasks': subtasks,
+        'subtask_statuses': subtask_statuses,  # Добавляем статусы для канбана
         'project': task.project,
     }
     
@@ -573,6 +625,133 @@ def duplicate_project(request, project_id):
             'message': f'Проект "{original_project.title}" успешно скопирован',
             'new_project_id': duplicated_project.id
         })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        
+        
+    
+@login_required
+def subtask_detail(request, subtask_id):
+    """Детальная страница подзадачи"""
+    subtask = get_object_or_404(SubTask, id=subtask_id)
+    
+    # Проверяем права доступа
+    if (request.user not in subtask.parent_task.assigned_to.all() and 
+        request.user != subtask.parent_task.project.creator and 
+        not request.user.is_superuser):
+        return HttpResponseForbidden("У вас нет доступа к этой подзадаче")
+    
+    context = {
+        'subtask': subtask,
+        'task': subtask.parent_task,
+        'project': subtask.parent_task.project,
+    }
+    
+    return render(request, 'projects/subtask_detail.html', context)
+
+@login_required
+def create_subtask_modal(request, task_id):
+    """Создание подзадачи через модальное окно"""
+    task = get_object_or_404(Task, pk=task_id)
+    
+    # Проверяем права
+    if (request.user not in task.assigned_to.all() and 
+        request.user != task.project.creator and 
+        request.user.role not in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'Нет прав на создание подзадач'})
+    
+    if request.method == 'POST':
+        form = SubTaskForm(request.POST, parent_task=task)
+        if form.is_valid():
+            subtask = form.save(commit=False)
+            subtask.parent_task = task
+            subtask.save()
+            form.save_m2m()
+            return JsonResponse({'success': True})
+        else:
+            html = render_to_string('projects/partials/subtask_form.html', 
+                                  {'form': form, 'task': task}, request=request)
+            return JsonResponse({'success': False, 'form_html': html})
+    else:
+        form = SubTaskForm(parent_task=task)
+        html = render_to_string('projects/partials/subtask_form.html', 
+                              {'form': form, 'task': task}, request=request)
+        return JsonResponse({'form_html': html})
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def update_subtask_status(request, subtask_id):
+    """Обновление статуса подзадачи через drag&drop"""
+    try:
+        subtask = get_object_or_404(SubTask, id=subtask_id)
+        
+        # Проверяем права
+        if (request.user not in subtask.parent_task.assigned_to.all() and 
+            request.user != subtask.parent_task.project.creator):
+            return JsonResponse({'error': 'Нет прав на изменение подзадачи'}, status=403)
+        
+        data = json.loads(request.body)
+        new_status_id = data.get('status_id')
+        
+        if not new_status_id:
+            return JsonResponse({'error': 'Не указан статус'}, status=400)
+        
+        try:
+            new_status = TaskStatus.objects.get(id=new_status_id)
+        except TaskStatus.DoesNotExist:
+            return JsonResponse({'error': 'Статус не найден'}, status=400)
+        
+        # Проверяем, что статус доступен для родительской задачи
+        if new_status not in subtask.parent_task.get_available_statuses():
+            return JsonResponse({'error': 'Статус недоступен для этой задачи'}, status=400)
+        
+        # Обновляем статус
+        subtask.status = new_status
+        
+        # Автоматически обновляем даты
+        if new_status.name == 'В работе' and not subtask.start_date:
+            subtask.start_date = timezone.now().date()
+        
+        if new_status.name == 'Завершена' and not subtask.end_date:
+            subtask.end_date = timezone.now().date()
+        
+        subtask.save()
+        
+        response_data = {
+            'success': True,
+            'subtask_id': subtask.id,
+            'status_name': subtask.status.name,
+        }
+        
+        return JsonResponse(response_data)
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Ошибка при копировании: {str(e)}'})
+        return JsonResponse({'error': str(e)}, status=500)
+@login_required
+def edit_subtask(request, subtask_id):
+    """Редактирование подзадачи"""
+    subtask = get_object_or_404(SubTask, id=subtask_id)
+    
+    # Проверяем права
+    if (request.user not in subtask.parent_task.assigned_to.all() and 
+        request.user != subtask.parent_task.project.creator and 
+        request.user.role not in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'Нет прав на редактирование подзадачи'})
+    
+    if request.method == 'POST':
+        form = SubTaskForm(request.POST, instance=subtask, parent_task=subtask.parent_task)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({'success': True})
+        else:
+            form_html = render_to_string('projects/partials/subtask_form.html', 
+                                       {'form': form, 'task': subtask.parent_task}, 
+                                       request=request)
+            return JsonResponse({'success': False, 'form_html': form_html})
+    else:
+        form = SubTaskForm(instance=subtask, parent_task=subtask.parent_task)
+        form_html = render_to_string('projects/partials/subtask_form.html', 
+                                   {'form': form, 'task': subtask.parent_task}, 
+                                   request=request)
+        return JsonResponse({'form_html': form_html})

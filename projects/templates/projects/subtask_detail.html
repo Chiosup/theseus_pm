@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Основная информация о подзадаче -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">{{ subtask.title }}</h4>
+                        <div>
+                            {% if subtask.priority %}
+                            <span class="badge" style="background-color: {{ subtask.priority.color }};">
+                                {{ subtask.priority.name }}
+                            </span>
+                            {% endif %}
+                            <span class="badge bg-secondary">{{ subtask.status.name }}</span>
+                            <small class="text-muted">Подзадача</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ subtask.description }}</p>
+                    
+                    <div class="task-meta mt-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Информация о подзадаче:</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Родительская задача:</strong> 
+                                        <a href="{% url 'task_detail' task.id %}">
+                                            {{ task.title }}
+                                        </a>
+                                    </li>
+                                    <li><strong>Проект:</strong> 
+                                        <a href="{% url 'project_detail' project.id %}">
+                                            {{ project.title }}
+                                        </a>
+                                    </li>
+                                    <li><strong>Статус:</strong> {{ subtask.status.name }}</li>
+                                    <li><strong>Приоритет:</strong> {{ subtask.priority.name|default:"Не указан" }}</li>
+                                    <li><strong>Срок выполнения:</strong> {{ subtask.due_date|default:"Не указан" }}</li>
+                                    {% if subtask.start_date %}
+                                    <li><strong>Начато:</strong> {{ subtask.start_date }}</li>
+                                    {% endif %}
+                                    {% if subtask.end_date %}
+                                    <li><strong>Завершено:</strong> {{ subtask.end_date }}</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Исполнители:</h6>
+                                {% if subtask.assigned_to.exists %}
+                                <ul class="list-unstyled">
+                                    {% for user in subtask.assigned_to.all %}
+                                    <li>{{ user.get_full_name|default:user.username }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <p class="text-muted">Исполнители не назначены</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Действия -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    {% if user in task.assigned_to.all or user.role in 'admin director manager' %}
+                    <div class="d-grid gap-2">
+                        {% if subtask.status.name != 'Завершена' %}
+                        <button class="btn btn-success btn-sm" onclick="completeSubTask({{ subtask.id }})">
+                            Завершить подзадачу
+                        </button>
+                        {% endif %}
+                        
+                        {% if subtask.status.name == 'Завершена' %}
+                        <button class="btn btn-warning btn-sm" onclick="reopenSubTask({{ subtask.id }})">
+                            Открыть заново
+                        </button>
+                        {% endif %}
+                        
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editSubTaskModal">
+                            Редактировать подзадачу
+                        </button>
+                        
+                        <a href="{% url 'task_detail' task.id %}" class="btn btn-outline-secondary btn-sm">
+                            Назад к задаче
+                        </a>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">У вас нет прав для изменения этой подзадачи</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Информация о задаче -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Родительская задача</h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ task.title }}</h6>
+                    <p class="small">{{ task.description|truncatewords:20 }}</p>
+                    <a href="{% url 'task_detail' task.id %}" class="btn btn-sm btn-outline-primary">
+                        Перейти к задаче
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования подзадачи -->
+<div class="modal fade" id="editSubTaskModal" tabindex="-1" aria-labelledby="editSubTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать подзадачу</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="editSubTaskModalBody">
+                <!-- Форма будет загружена через AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function completeSubTask(subtaskId) {
+    if (confirm('Вы уверены, что хотите завершить эту подзадачу?')) {
+        fetch(`/projects/subtask/${subtaskId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+function reopenSubTask(subtaskId) {
+    if (confirm('Вы уверены, что хотите открыть подзадачу заново?')) {
+        fetch(`/projects/subtask/${subtaskId}/reopen/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+// JavaScript для модального окна редактирования подзадачи
+$(document).ready(function(){
+    $('#editSubTaskModal').on('show.bs.modal', function (e) {
+        $.ajax({
+            url: "{% url 'edit_subtask' subtask.id %}",
+            type: 'GET',
+            success: function(data) {
+                $('#editSubTaskModalBody').html(data.form_html);
+            },
+            error: function(xhr) {
+                console.error('Ошибка загрузки формы:', xhr.responseText);
+            }
+        });
+    });
+
+    $(document).on('submit', '#subtaskForm', function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: "{% url 'edit_subtask' subtask.id %}",
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    $('#editSubTaskModal').modal('hide');
+                    location.reload();
+                } else {
+                    $('#editSubTaskModalBody').html(response.form_html);
+                }
+            },
+            error: function(xhr) {
+                console.error('Ошибка отправки формы:', xhr.responseText);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

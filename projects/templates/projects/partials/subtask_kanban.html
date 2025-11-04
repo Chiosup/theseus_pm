@@ -1,0 +1,396 @@
+{% load project_filters %}
+<div class="subtask-kanban-container">
+    <div class="kanban-container">
+        {% for status in subtask_statuses %}
+        <div class="kanban-column" 
+             id="subtask-status-{{ status.id }}-column" 
+             ondrop="dropSubTask(event)" 
+             ondragover="allowDrop(event)"
+             data-status-id="{{ status.id }}">
+            <div class="kanban-column-header" style="border-left: 4px solid {{ status.color }};">
+                <h5>{{ status.name }}</h5>
+                <span class="task-count">{{ subtasks|filter_status:status.id|length }}</span>
+            </div>
+            
+            {% for subtask in subtasks %}
+                {% if subtask.status.id == status.id %}
+                <div class="kanban-task" 
+                     draggable="true" 
+                     ondragstart="dragSubTask(event)" 
+                     id="subtask-{{ subtask.id }}" 
+                     data-task-id="{{ subtask.id }}"
+                     data-status-id="{{ status.id }}">
+                    <div class="task-header">
+                        <a href="{% url 'subtask_detail' subtask.id %}" class="task-title">
+                            {{ subtask.title }}
+                        </a>
+                        {% if subtask.priority %}
+                        <span class="task-priority priority-{{ subtask.priority.name|lower }}" 
+                              style="background-color: {{ subtask.priority.color }};">
+                            {{ subtask.priority.name }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="task-meta">
+                        <small class="text-muted">
+                            {% if subtask.assigned_to.exists %}
+                            Назначено: {{ subtask.assigned_to.first.get_full_name }}
+                            {% endif %}
+                        </small>
+                        {% if subtask.due_date %}
+                        <br><small>Срок: {{ subtask.due_date }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% empty %}
+                <div class="kanban-empty">
+                    <p>Нет подзадач</p>
+                </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.subtask-kanban-container .kanban-container {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.subtask-kanban-container .kanban-column {
+    flex: 1;
+    min-width: 250px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 10px;
+    min-height: 300px;
+    border: 1px solid #e9ecef;
+}
+
+.subtask-kanban-container .kanban-column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-left: 10px;
+}
+
+.subtask-kanban-container .kanban-column-header h5 {
+    margin: 0;
+    font-size: 1em;
+}
+
+.subtask-kanban-container .task-count {
+    background: #6c757d;
+    color: white;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.8em;
+}
+
+.subtask-kanban-container .kanban-task {
+    background: white;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    cursor: move;
+    transition: all 0.2s ease;
+    border-left: 2px solid #4a76a8;
+    font-size: 0.9em;
+}
+
+.subtask-kanban-container .kanban-task:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.subtask-kanban-container .kanban-task.dragging {
+    opacity: 0.6;
+    transform: rotate(3deg);
+}
+
+.subtask-kanban-container .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.subtask-kanban-container .task-title {
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    flex: 1;
+    font-size: 0.9em;
+}
+
+.subtask-kanban-container .task-title:hover {
+    color: #4a76a8;
+}
+
+.subtask-kanban-container .task-priority {
+    font-size: 0.6em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: white;
+    margin-left: 6px;
+}
+
+.subtask-kanban-container .task-meta {
+    font-size: 0.75em;
+}
+
+.subtask-kanban-container .kanban-empty {
+    text-align: center;
+    color: #6c757d;
+    padding: 20px;
+    font-size: 0.9em;
+}
+
+.subtask-kanban-container .kanban-column.highlight {
+    background: #e3f2fd;
+    border: 2px dashed #4a76a8;
+}
+</style>
+
+<script>
+// Функции для drag&drop подзадач
+function dragSubTask(ev) {
+    const statusMap = getSubTaskStatusMap();
+    const currentColumn = ev.target.closest('.kanban-column');
+    const currentStatusId = currentColumn ? statusMap[currentColumn.id] : null;
+    
+    ev.dataTransfer.setData("text", ev.target.id);
+    ev.dataTransfer.setData("current-status", currentStatusId);
+    ev.target.classList.add('dragging');
+}
+// Функции для drag&drop подзадач
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('highlight');
+}
+
+function dragSubTask(ev) {
+    const statusMap = getSubTaskStatusMap();
+    const currentColumn = ev.target.closest('.kanban-column');
+    const currentStatusId = currentColumn ? statusMap[currentColumn.id] : null;
+    
+    ev.dataTransfer.setData("text", ev.target.id);
+    ev.dataTransfer.setData("current-status", currentStatusId);
+    ev.target.classList.add('dragging');
+}
+
+function dropSubTask(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('highlight');
+    
+    const subtaskId = ev.dataTransfer.getData("text");
+    const currentStatusId = ev.dataTransfer.getData("current-status");
+    const subtaskElement = document.getElementById(subtaskId);
+    
+    if (!subtaskElement) {
+        console.error('SubTask element not found');
+        return;
+    }
+    
+    const columnId = ev.currentTarget.id;
+    const statusMap = getSubTaskStatusMap();
+    const newStatusId = statusMap[columnId];
+    
+    if (!newStatusId) {
+        console.error('Unknown column:', columnId);
+        return;
+    }
+    
+    // Если статус не изменился, ничего не делаем
+    if (parseInt(currentStatusId) === parseInt(newStatusId)) {
+        subtaskElement.classList.remove('dragging');
+        return;
+    }
+    
+    // Визуальное перемещение
+    ev.currentTarget.appendChild(subtaskElement);
+    subtaskElement.classList.remove('dragging');
+    
+    // Обновляем счетчик подзадач
+    updateSubTaskCounts();
+    
+    // Отправка на сервер
+    updateSubTaskStatus(subtaskId.replace('subtask-', ''), newStatusId, subtaskElement);
+}
+
+function getSubTaskStatusMap() {
+    const statusMap = {};
+    {% for status in subtask_statuses %}
+    statusMap['subtask-status-{{ status.id }}-column'] = {{ status.id }};
+    {% endfor %}
+    return statusMap;
+}
+
+function updateSubTaskCounts() {
+    document.querySelectorAll('.subtask-kanban-container .kanban-column').forEach(column => {
+        const taskCount = column.querySelectorAll('.kanban-task').length;
+        const countElement = column.querySelector('.task-count');
+        if (countElement) {
+            countElement.textContent = taskCount;
+        }
+    });
+}
+
+function updateSubTaskStatus(subtaskId, newStatusId, subtaskElement) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const currentStatusId = subtaskElement.getAttribute('data-status-id');
+    
+    fetch(`/projects/subtask/${subtaskId}/update_status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ status_id: newStatusId })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { 
+                console.error('Server error:', err);
+                throw err; 
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Статус подзадачи обновлен:', data);
+        subtaskElement.setAttribute('data-status-id', newStatusId);
+        showNotification('Статус подзадачи обновлен', 'success');
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showNotification(error.error || 'Ошибка при обновлении статуса подзадачи', 'error');
+        
+        // Возвращаем подзадачу в исходную колонку
+        const originalColumn = document.querySelector(`[data-status-id="${currentStatusId}"]`);
+        if (originalColumn) {
+            originalColumn.appendChild(subtaskElement);
+        }
+        updateSubTaskCounts();
+    });
+}
+
+// Убираем подсветку при уходе с колонки
+document.querySelectorAll('.subtask-kanban-container .kanban-column').forEach(column => {
+    column.addEventListener('dragleave', function(e) {
+        if (!this.contains(e.relatedTarget)) {
+            this.classList.remove('highlight');
+        }
+    });
+});
+function dropSubTask(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('highlight');
+    
+    const subtaskId = ev.dataTransfer.getData("text");
+    const currentStatusId = ev.dataTransfer.getData("current-status");
+    const subtaskElement = document.getElementById(subtaskId);
+    
+    if (!subtaskElement) {
+        console.error('SubTask element not found');
+        return;
+    }
+    
+    const columnId = ev.currentTarget.id;
+    const statusMap = getSubTaskStatusMap();
+    const newStatusId = statusMap[columnId];
+    
+    if (!newStatusId) {
+        console.error('Unknown column:', columnId);
+        return;
+    }
+    
+    // Если статус не изменился, ничего не делаем
+    if (parseInt(currentStatusId) === parseInt(newStatusId)) {
+        subtaskElement.classList.remove('dragging');
+        return;
+    }
+    
+    // Визуальное перемещение
+    ev.currentTarget.appendChild(subtaskElement);
+    subtaskElement.classList.remove('dragging');
+    
+    // Обновляем счетчик подзадач
+    updateSubTaskCounts();
+    
+    // Отправка на сервер
+    updateSubTaskStatus(subtaskId.replace('subtask-', ''), newStatusId, subtaskElement);
+}
+
+function getSubTaskStatusMap() {
+    const statusMap = {};
+    {% for status in subtask_statuses %}
+    statusMap['subtask-status-{{ status.id }}-column'] = {{ status.id }};
+    {% endfor %}
+    return statusMap;
+}
+
+function updateSubTaskCounts() {
+    document.querySelectorAll('.subtask-kanban-container .kanban-column').forEach(column => {
+        const taskCount = column.querySelectorAll('.kanban-task').length;
+        const countElement = column.querySelector('.task-count');
+        if (countElement) {
+            countElement.textContent = taskCount;
+        }
+    });
+}
+
+function updateSubTaskStatus(subtaskId, newStatusId, subtaskElement) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const currentStatusId = subtaskElement.getAttribute('data-status-id');
+    
+    fetch(`/projects/subtask/${subtaskId}/update_status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ status_id: newStatusId })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { 
+                console.error('Server error:', err);
+                throw err; 
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Статус подзадачи обновлен:', data);
+        subtaskElement.setAttribute('data-status-id', newStatusId);
+        showNotification('Статус подзадачи обновлен', 'success');
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showNotification(error.error || 'Ошибка при обновлении статуса подзадачи', 'error');
+        
+        // Возвращаем подзадачу в исходную колонку
+        const originalColumn = document.querySelector(`[data-status-id="${currentStatusId}"]`);
+        if (originalColumn) {
+            originalColumn.appendChild(subtaskElement);
+        }
+        updateSubTaskCounts();
+    });
+}
+
+// Убираем подсветку при уходе с колонки
+document.querySelectorAll('.subtask-kanban-container .kanban-column').forEach(column => {
+    column.addEventListener('dragleave', function(e) {
+        if (!this.contains(e.relatedTarget)) {
+            this.classList.remove('highlight');
+        }
+    });
+});
+</script>

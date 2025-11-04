@@ -24,4 +24,12 @@ urlpatterns = [
     
     # Сотрудники
     path('employees/', views.employee_list, name='employee_list'),
+    # Подзадачи
+    path('subtask/<int:subtask_id>/', views.subtask_detail, name='subtask_detail'),
+    path('subtask/<int:subtask_id>/update_status/', views.update_subtask_status, name='update_subtask_status'),
+    path('subtask/<int:subtask_id>/edit/', views.edit_subtask, name='edit_subtask'),
+    path('task/<int:task_id>/create_subtask/', views.create_subtask_modal, name='create_subtask_modal'),
+    path('subtask/<int:subtask_id>/complete/', views.complete_subtask, name='complete_subtask'),
+    path('subtask/<int:subtask_id>/reopen/', views.reopen_subtask, name='reopen_subtask'),
+
 ]

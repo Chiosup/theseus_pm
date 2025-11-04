@@ -73,6 +73,7 @@ class Project(models.Model):
     
     # Статусы, которые используются в этом проекте
     available_statuses = models.ManyToManyField(TaskStatus, blank=True, verbose_name="Доступные статусы")
+    
     def get_project_statuses(self):
         """Получить статусы, выбранные для этого проекта"""
         if self.available_statuses.exists():
@@ -88,6 +89,7 @@ class Project(models.Model):
         if not default_status:
             default_status = statuses.first()
         return default_status
+    
     def __str__(self):
         return f"{self.title} ({self.version})"
     
@@ -127,6 +129,12 @@ class Task(models.Model):
     parent_task = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True,
                                    related_name='subtasks', verbose_name="Родительская задача")
     
+    # НОВЫЕ ПОЛЯ ДЛЯ КАНБАН-ДОСКИ ПОДЗАДАЧ
+    has_kanban = models.BooleanField(default=False, verbose_name="Использовать канбан-доску для подзадач")
+    subtask_statuses = models.ManyToManyField(TaskStatus, blank=True, 
+                                             related_name='kanban_tasks',
+                                             verbose_name="Статусы для подзадач")
+    
     def __str__(self):
         return self.title
     
@@ -148,3 +156,60 @@ class Task(models.Model):
     def is_subtask(self):
         """Проверить, является ли задача подзадачей"""
         return self.parent_task is not None
+    
+    def get_available_statuses(self):
+        """Получить доступные статусы для подзадач"""
+        if self.subtask_statuses.exists():
+            return self.subtask_statuses.filter(is_active=True).order_by('order')
+        else:
+            # По умолчанию используем все активные статусы
+            return TaskStatus.objects.filter(is_active=True).order_by('order')
+
+class SubTask(models.Model):
+    """Подзадачи"""
+    title = models.CharField(max_length=255, verbose_name="Название")
+    description = models.TextField(verbose_name="Описание", blank=True)
+    due_date = models.DateField(verbose_name="Срок выполнения", null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    
+    status = models.ForeignKey(TaskStatus, on_delete=models.SET_NULL, null=True, 
+                              verbose_name="Статус")
+    priority = models.ForeignKey(TaskPriority, on_delete=models.SET_NULL, null=True, blank=True,
+                                verbose_name="Приоритет")
+    
+    parent_task = models.ForeignKey(Task, on_delete=models.CASCADE, 
+                                   related_name='subtasks_list', verbose_name="Родительская задача")
+    assigned_to = models.ManyToManyField(User, related_name="subtasks", verbose_name="Исполнители", blank=True)
+    
+    order = models.IntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Подзадача"
+        verbose_name_plural = "Подзадачи"
+        ordering = ['order', 'created_at']
+    
+    def __str__(self):
+        return f"{self.title} (подзадача {self.parent_task.title})"
+    
+    def get_available_statuses(self):
+        """Получить доступные статусы для подзадачи"""
+        return self.parent_task.get_available_statuses()
+    
+    def get_default_status(self):
+        """Получить статус по умолчанию"""
+        statuses = self.get_available_statuses()
+        default_status = statuses.filter(is_default=True).first()
+        if not default_status:
+            default_status = statuses.first()
+        return default_status
+    
+    def save(self, *args, **kwargs):
+        # Устанавливаем статус по умолчанию при создании
+        if not self.status_id:
+            default_status = self.get_default_status()
+            if default_status:
+                self.status = default_status
+        super().save(*args, **kwargs)

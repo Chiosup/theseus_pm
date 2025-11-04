@@ -68,27 +68,76 @@
             </div>
 
             <!-- Подзадачи -->
-            {% if subtasks %}
             <div class="card mt-4">
                 <div class="card-header">
-                    <h5 class="mb-0">Подзадачи</h5>
-                </div>
-                <div class="card-body">
-                    <div class="list-group">
-                        {% for subtask in subtasks %}
-                        <a href="{% url 'task_detail' subtask.id %}" class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ subtask.title }}</h6>
-                                <small class="text-muted">{{ subtask.status.name }}</small>
-                            </div>
-                            <p class="mb-1">{{ subtask.description|truncatewords:20 }}</p>
-                            <small>Срок: {{ subtask.due_date|default:"Не указан" }}</small>
-                        </a>
-                        {% endfor %}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Подзадачи</h5>
+                        {% if user in task.assigned_to.all or user.role in 'admin director manager' %}
+                        <div>
+                                           
+                            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createSubTaskModal" id="createSubTaskBtn">
+                                <i class="fas fa-plus"></i> Добавить подзадачу
+                            </button>
+                            
+                            {% if not task.has_kanban %}
+                            <small class="text-muted ms-2"><i class="fas fa-info-circle"></i> Канбан-доска отключена</small>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <small class="text-muted">Нет прав для создания подзадач</small>
+                        {% endif %}
                     </div>
                 </div>
+                <div class="card-body">
+                    {% if task.has_kanban and subtask_statuses %}
+                        <!-- Канбан-доска для подзадач -->
+                        {% include 'projects/partials/subtask_kanban.html' %}
+                    {% else %}
+                        <!-- Обычный список подзадач -->
+                        {% if subtasks %}
+                            <div class="list-group">
+                                {% for subtask in subtasks %}
+                                <a href="{% url 'subtask_detail' subtask.id %}" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ subtask.title }}</h6>
+                                        <div>
+                                            {% if subtask.priority %}
+                                            <span class="badge me-1" style="background-color: {{ subtask.priority.color }};">
+                                                {{ subtask.priority.name }}
+                                            </span>
+                                            {% endif %}
+                                            <span class="badge bg-secondary">{{ subtask.status.name }}</span>
+                                        </div>
+                                    </div>
+                                    <p class="mb-1">{{ subtask.description|truncatewords:20 }}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small>Срок: {{ subtask.due_date|default:"Не указан" }}</small>
+                                        <small>Исполнители: 
+                                            {% for user in subtask.assigned_to.all %}
+                                                {{ user.get_full_name|default:user.username }}{% if not forloop.last %}, {% endif %}
+                                            {% empty %}
+                                                Не назначены
+                                            {% endfor %}
+                                        </small>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-tasks fa-3x mb-3"></i>
+                                <p>Подзадачи отсутствуют</p>
+                                {% if not task.has_kanban %}
+                                <small class="d-block mt-2">
+                                    <i class="fas fa-lightbulb"></i> 
+                                    Вы можете включить канбан-доску для подзадач в настройках задачи
+                                </small>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
         </div>
 
         <div class="col-md-4">
@@ -154,6 +203,26 @@
     </div>
 </div>
 
+<!-- Модальное окно создания подзадачи -->
+<div class="modal fade" id="createSubTaskModal" tabindex="-1" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createSubTaskModalLabel">Создать подзадачу</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="createSubTaskModalBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p>Загрузка формы...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function completeTask(taskId) {
     if (confirm('Вы уверены, что хотите завершить эту задачу?')) {
@@ -201,8 +270,55 @@ function reopenTask(taskId) {
     }
 }
 
-// JavaScript для модального окна редактирования
+function completeSubTask(subtaskId) {
+    if (confirm('Вы уверены, что хотите завершить эту подзадачу?')) {
+        fetch(`/projects/subtask/${subtaskId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+function reopenSubTask(subtaskId) {
+    if (confirm('Вы уверены, что хотите открыть подзадачу заново?')) {
+        fetch(`/projects/subtask/${subtaskId}/reopen/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+// JavaScript для модальных окон
 $(document).ready(function(){
+    // Модальное окно редактирования задачи
     $('#editTaskModal').on('show.bs.modal', function (e) {
         $.ajax({
             url: "{% url 'edit_task' task.id %}",
@@ -216,6 +332,7 @@ $(document).ready(function(){
         });
     });
 
+    // Обработка формы редактирования задачи
     $(document).on('submit', '#taskForm', function(e){
         e.preventDefault();
         $.ajax({
@@ -235,6 +352,89 @@ $(document).ready(function(){
             }
         });
     });
+
+    // Модальное окно создания подзадачи
+    $('#createSubTaskModal').on('show.bs.modal', function () {
+        console.log('Modal opening...');
+        
+        $.ajax({
+            url: "{% url 'create_subtask_modal' task.id %}",
+            type: 'GET',
+            success: function(data) {
+                console.log('Form loaded successfully');
+                $('#createSubTaskModalBody').html(data.form_html);
+            },
+            error: function(xhr) {
+                console.error('Ошибка загрузки формы подзадачи:', xhr.responseText);
+                $('#createSubTaskModalBody').html('<div class="alert alert-danger">Ошибка загрузки формы</div>');
+            }
+        });
+    });
+
+    // Обработка формы создания подзадачи с защитой от двойной отправки
+    let isSubmitting = false;
+
+    $(document).on('submit', '#subtaskForm', function(e){
+        e.preventDefault();
+        
+        if (isSubmitting) {
+            console.log('Форма уже отправляется...');
+            return;
+        }
+        
+        isSubmitting = true;
+        console.log('Form submitted (single)');
+        
+        // Блокируем кнопку
+        const submitBtn = $(this).find('button[type="submit"]');
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status"></span> Создание...');
+        
+        $.ajax({
+            url: "{% url 'create_subtask_modal' task.id %}",
+            method: "POST",
+            data: $(this).serialize(),
+            success: function(response){
+                console.log('Form submit success:', response);
+                if (response.success) {
+                    $('#createSubTaskModal').modal('hide');
+                    location.reload();
+                } else {
+                    $('#createSubTaskModalBody').html(response.form_html);
+                }
+            },
+            error: function(xhr, status, error){
+                console.error('Form submit error:', error);
+                $('#createSubTaskModalBody').html('<div class="alert alert-danger">Ошибка при создании подзадачи</div>');
+            },
+            complete: function() {
+                isSubmitting = false;
+                submitBtn.prop('disabled', false).text('Создать');
+            }
+        });
+    });
 });
+// Добавьте эту функцию в ваш скрипт
+function showNotification(message, type = 'success') {
+    // Создаем уведомление с помощью Bootstrap toast или alert
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Автоматически скрываем через 3 секунды
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
 </script>
+
 {% endblock %}
+[file content end]
