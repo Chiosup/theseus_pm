@@ -73,7 +73,21 @@ class Project(models.Model):
     
     # Статусы, которые используются в этом проекте
     available_statuses = models.ManyToManyField(TaskStatus, blank=True, verbose_name="Доступные статусы")
+    def get_project_statuses(self):
+        """Получить статусы, выбранные для этого проекта"""
+        if self.available_statuses.exists():
+            return self.available_statuses.filter(is_active=True).order_by('order')
+        else:
+            # Возвращаем все активные статусы по умолчанию
+            return TaskStatus.objects.filter(is_active=True).order_by('order')
     
+    def get_default_status(self):
+        """Получить статус по умолчанию для проекта"""
+        statuses = self.get_project_statuses()
+        default_status = statuses.filter(is_default=True).first()
+        if not default_status:
+            default_status = statuses.first()
+        return default_status
     def __str__(self):
         return f"{self.title} ({self.version})"
     

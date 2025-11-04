@@ -1,34 +1,240 @@
 {% extends 'base.html' %}
+
 {% block content %}
-<h2>{{ task.title }}</h2>
-<p><strong>Описание:</strong> {{ task.description }}</p>
-<p><strong>Приоритет:</strong> {{ task.priority }}</p>
-<p><strong>Статус:</strong> {{ task.status }}</p>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Основная информация о задаче -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">{{ task.title }}</h4>
+                        <div>
+                            {% if task.priority %}
+                            <span class="badge" style="background-color: {{ task.priority.color }};">
+                                {{ task.priority.name }}
+                            </span>
+                            {% endif %}
+                            <span class="badge bg-secondary">{{ task.status.name }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ task.description }}</p>
+                    
+                    <div class="task-meta mt-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Информация о задаче:</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Проект:</strong> 
+                                        <a href="{% url 'project_detail' task.project.id %}">
+                                            {{ task.project.title }}
+                                        </a>
+                                    </li>
+                                    <li><strong>Статус:</strong> {{ task.status.name }}</li>
+                                    <li><strong>Приоритет:</strong> {{ task.priority.name|default:"Не указан" }}</li>
+                                    <li><strong>Срок выполнения:</strong> {{ task.due_date|default:"Не указан" }}</li>
+                                    {% if task.start_date %}
+                                    <li><strong>Начато:</strong> {{ task.start_date }}</li>
+                                    {% endif %}
+                                    {% if task.end_date %}
+                                    <li><strong>Завершено:</strong> {{ task.end_date }}</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Исполнители:</h6>
+                                {% if task.assigned_to.exists %}
+                                <ul class="list-unstyled">
+                                    {% for user in task.assigned_to.all %}
+                                    <li>{{ user.get_full_name|default:user.username }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <p class="text-muted">Исполнители не назначены</p>
+                                {% endif %}
+                                
+                                {% if task.previous_task %}
+                                <h6 class="mt-3">Предыдущая задача:</h6>
+                                <a href="{% url 'task_detail' task.previous_task.id %}">
+                                    {{ task.previous_task.title }}
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<div class="btn-group" role="group">
-    {% if task.status == "new" %}
-        <form action="{% url 'start_task' task.id %}" method="post" class="mr-2">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-warning">Начать выполнение</button>
-        </form>
-    {% elif task.status == "in_progress" %}
-        <a href="{% url 'complete_task' task.id %}" class="btn btn-success mr-2">Завершить</a>
-        <a href="{% url 'revert_to_pending' task.id %}" class="btn btn-warning mr-2">Вернуть в ожидание</a>
-    {% elif task.status == "done" %}
-        <a href="{% url 'revert_to_in_progress' task.id %}" class="btn btn-danger mr-2">Вернуть в процесс</a>
-    {% endif %}
+            <!-- Подзадачи -->
+            {% if subtasks %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Подзадачи</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for subtask in subtasks %}
+                        <a href="{% url 'task_detail' subtask.id %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ subtask.title }}</h6>
+                                <small class="text-muted">{{ subtask.status.name }}</small>
+                            </div>
+                            <p class="mb-1">{{ subtask.description|truncatewords:20 }}</p>
+                            <small>Срок: {{ subtask.due_date|default:"Не указан" }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
 
-    <!-- Кнопка редактирования -->
-    <a href="{% url 'edit_task' task.id %}" class="btn btn-primary mr-2">Редактировать</a>
-    
-    <!-- Кнопка удаления -->
-    <form action="{% url 'delete_task' task.id %}" method="post" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить эту задачу?')">Удалить</button>
-    </form>
+        <div class="col-md-4">
+            <!-- Действия -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    {% if user in task.assigned_to.all or user.role in 'admin director manager' %}
+                    <div class="d-grid gap-2">
+                        {% if task.status.name != 'Завершена' %}
+                        <button class="btn btn-success" onclick="completeTask({{ task.id }})">
+                            Завершить задачу
+                        </button>
+                        {% endif %}
+                        
+                        {% if task.status.name == 'Завершена' %}
+                        <button class="btn btn-warning" onclick="reopenTask({{ task.id }})">
+                            Открыть заново
+                        </button>
+                        {% endif %}
+                        
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTaskModal">
+                            Редактировать задачу
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">У вас нет прав для изменения этой задачи</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Информация о проекте -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Проект</h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ task.project.title }}</h6>
+                    <p class="small">{{ task.project.description|truncatewords:20 }}</p>
+                    <a href="{% url 'project_detail' task.project.id %}" class="btn btn-sm btn-outline-primary">
+                        Перейти к проекту
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="mt-3">
-    <a href="{% url 'project_detail' task.project.id %}" class="btn btn-secondary">Назад к проекту</a>
+<!-- Модальное окно редактирования задачи -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать задачу</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="editTaskModalBody">
+                <!-- Форма будет загружена через AJAX -->
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function completeTask(taskId) {
+    if (confirm('Вы уверены, что хотите завершить эту задачу?')) {
+        fetch(`/projects/task/${taskId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+function reopenTask(taskId) {
+    if (confirm('Вы уверены, что хотите открыть задачу заново?')) {
+        fetch(`/projects/task/${taskId}/reopen/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка');
+        });
+    }
+}
+
+// JavaScript для модального окна редактирования
+$(document).ready(function(){
+    $('#editTaskModal').on('show.bs.modal', function (e) {
+        $.ajax({
+            url: "{% url 'edit_task' task.id %}",
+            type: 'GET',
+            success: function(data) {
+                $('#editTaskModalBody').html(data.form_html);
+            },
+            error: function(xhr) {
+                console.error('Ошибка загрузки формы:', xhr.responseText);
+            }
+        });
+    });
+
+    $(document).on('submit', '#taskForm', function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: "{% url 'edit_task' task.id %}",
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    $('#editTaskModal').modal('hide');
+                    location.reload();
+                } else {
+                    $('#editTaskModalBody').html(response.form_html);
+                }
+            },
+            error: function(xhr) {
+                console.error('Ошибка отправки формы:', xhr.responseText);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

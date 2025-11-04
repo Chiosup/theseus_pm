@@ -1,0 +1,139 @@
+<form id="taskForm" method="post">
+    {% csrf_token %}
+    
+    <div class="form-group">
+        <label for="{{ form.title.id_for_label }}">Название задачи:</label>
+        {{ form.title }}
+        {% if form.title.errors %}
+            <div class="error">{{ form.title.errors }}</div>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <label for="{{ form.description.id_for_label }}">Описание:</label>
+        {{ form.description }}
+        {% if form.description.errors %}
+            <div class="error">{{ form.description.errors }}</div>
+        {% endif %}
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="{{ form.status.id_for_label }}">Статус:</label>
+                {{ form.status }}
+                {% if form.status.errors %}
+                    <div class="error">{{ form.status.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="{{ form.priority.id_for_label }}">Приоритет:</label>
+                {{ form.priority }}
+                {% if form.priority.errors %}
+                    <div class="error">{{ form.priority.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="{{ form.start_date.id_for_label }}">Дата начала:</label>
+                {{ form.start_date }}
+                {% if form.start_date.errors %}
+                    <div class="error">{{ form.start_date.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="{{ form.due_date.id_for_label }}">Срок выполнения:</label>
+                {{ form.due_date }}
+                {% if form.due_date.errors %}
+                    <div class="error">{{ form.due_date.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="{{ form.assigned_to.id_for_label }}">Исполнители:</label>
+        {{ form.assigned_to }}
+        {% if form.assigned_to.errors %}
+            <div class="error">{{ form.assigned_to.errors }}</div>
+        {% endif %}
+    </div>
+    
+    {% if form.previous_task %}
+    <div class="form-group">
+        <label for="{{ form.previous_task.id_for_label }}">Предыдущая задача:</label>
+        {{ form.previous_task }}
+        {% if form.previous_task.errors %}
+            <div class="error">{{ form.previous_task.errors }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% if form.parent_task %}
+    <div class="form-group">
+        <label for="{{ form.parent_task.id_for_label }}">Родительская задача:</label>
+        {{ form.parent_task }}
+        {% if form.parent_task.errors %}
+            <div class="error">{{ form.parent_task.errors }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+            {% if task %}Сохранить изменения{% else %}Создать задачу{% endif %}
+        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    </div>
+</form>
+
+<style>
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.error {
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: 5px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #4a76a8;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+</style>

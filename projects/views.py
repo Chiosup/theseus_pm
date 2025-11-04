@@ -43,33 +43,93 @@ def project_list(request):
         project.completed_tasks_count = project.tasks.filter(status="completed").count()
 
     return render(request, "projects/project_list.html", {"projects": projects})
-
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def update_task_status(request, task_id):
+    """Обновление статуса задачи через drag&drop"""
+    try:
+        task = get_object_or_404(Task, id=task_id)
+        
+        # Проверяем права - пользователь должен быть участником проекта или создателем
+        if request.user not in task.project.participants.all() and request.user != task.project.creator:
+            return JsonResponse({'error': 'Нет прав на изменение задачи'}, status=403)
+        
+        # Парсим JSON данные
+        data = json.loads(request.body)
+        new_status_id = data.get('status_id')
+        
+        if not new_status_id:
+            return JsonResponse({'error': 'Не указан статус'}, status=400)
+        
+        # Находим новый статус
+        try:
+            new_status = TaskStatus.objects.get(id=new_status_id)
+        except TaskStatus.DoesNotExist:
+            return JsonResponse({'error': 'Статус не найден'}, status=400)
+        
+        # Проверяем, что статус доступен для этого проекта
+        if new_status not in task.project.get_project_statuses():
+            return JsonResponse({'error': 'Статус недоступен для этого проекта'}, status=400)
+        
+        # Обновляем статус
+        old_status = task.status
+        task.status = new_status
+        
+        # Автоматически обновляем даты при изменении статуса
+        from django.utils import timezone
+        
+        if new_status.name == 'В работе' and not task.start_date:
+            task.start_date = timezone.now().date()
+        
+        if new_status.name == 'Завершена' and not task.end_date:
+            task.end_date = timezone.now().date()
+        
+        task.save()
+        
+        # Возвращаем обновленные данные
+        response_data = {
+            'success': True,
+            'task_id': task.id,
+            'status_name': task.status.name,
+            'start_date': task.start_date.isoformat() if task.start_date else None,
+            'end_date': task.end_date.isoformat() if task.end_date else None,
+        }
+        
+        return JsonResponse(response_data)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Неверный формат данных'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 @login_required
 def project_detail(request, project_id):
-    """Отображение деталей проекта и списка задач в нем."""
     project = get_object_or_404(Project, id=project_id)
-    tasks = project.tasks.all().order_by("due_date")
-
+    tasks = project.tasks.all().select_related('status').prefetch_related('assigned_to')
+    
+    # Получаем статусы, выбранные для этого проекта
+    project_statuses = project.get_project_statuses()
+    
+    # Готовим данные для диаграммы Ганта
     tasks_data = []
     for task in tasks:
-        tasks_data.append({
-            "id": task.id,
-            "name": task.title,
-            "start": task.start_date.strftime("%Y-%m-%d") if task.start_date else None,
-            "end": task.end_date.strftime("%Y-%m-%d") if task.end_date else None,
-            "progress": 100 if task.status == "done" else (50 if task.status == "in_progress" else 0)
-        })
-
-    tasks_json = json.dumps(tasks_data, ensure_ascii=False)  # Генерация JSON
-
-    print("DEBUG JSON:", tasks_json)  # Выведи в консоль сервера для отладки
-
-    return render(request, 'projects/project_detail.html', {
-        "project": project,
-        "tasks": tasks,  # Передаем задачи для списка
-        "tasks_json": tasks_json  # Передаем JSON для диаграммы Ганта
-    })
-
+        task_data = {
+            'id': str(task.id),
+            'name': task.title,
+            'start': task.start_date.isoformat() if task.start_date else None,
+            'end': task.end_date.isoformat() if task.end_date else None,
+            'status': task.status.name if task.status else 'Без статуса'
+        }
+        tasks_data.append(task_data)
+    
+    context = {
+        'project': project,
+        'tasks': tasks,
+        'project_statuses': project_statuses,  # Добавляем статусы проекта
+        'tasks_json': json.dumps(tasks_data),
+    }
+    
+    return render(request, 'projects/project_detail.html', context)
 @login_required
 @require_http_methods(["GET", "POST"])
 def create_project(request):
@@ -134,9 +194,27 @@ def update_task_status(request, task_id):
             task.save()
     
     return redirect('project_detail', project_id=task.project.id)
+@login_required
 def task_detail(request, task_id):
+    """Детальная страница задачи"""
     task = get_object_or_404(Task, id=task_id)
-    return render(request, "projects/task_detail.html", {"task": task})
+    
+    # Проверяем права доступа
+    if (request.user not in task.project.participants.all() and 
+        request.user != task.project.creator and 
+        not request.user.is_superuser):
+        return HttpResponseForbidden("У вас нет доступа к этой задаче")
+    
+    # Получаем подзадачи
+    subtasks = task.subtasks.all()
+    
+    context = {
+        'task': task,
+        'subtasks': subtasks,
+        'project': task.project,
+    }
+    
+    return render(request, 'projects/task_detail.html', context)
 
 @login_required
 def start_task(request, task_id):
@@ -187,21 +265,78 @@ def create_task(request, project_id):
         'project': project,  # Передаем проект в шаблон
     })
 
+@login_required
 def edit_task(request, task_id):
+    """Редактирование задачи через модальное окно"""
     task = get_object_or_404(Task, id=task_id)
     
+    # Проверяем права
+    if (request.user not in task.assigned_to.all() and 
+        request.user != task.project.creator and 
+        request.user.role not in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'У вас нет прав на редактирование этой задачи'})
+    
     if request.method == 'POST':
-        form = TaskForm(request.POST, instance=task)
+        form = TaskForm(request.POST, instance=task, project=task.project)
         if form.is_valid():
             form.save()
-            return redirect('task_detail', task_id=task.id)
+            return JsonResponse({'success': True})
+        else:
+            form_html = render_to_string('projects/task_form.html', {'form': form, 'task': task}, request=request)
+            return JsonResponse({'success': False, 'form_html': form_html})
     else:
-        form = TaskForm(instance=task)
+        form = TaskForm(instance=task, project=task.project)
+        form_html = render_to_string('projects/task_form.html', {'form': form, 'task': task}, request=request)
+        return JsonResponse({'form_html': form_html})
+
+@require_http_methods(["POST"])
+@login_required
+def complete_task(request, task_id):
+    """Завершение задачи"""
+    task = get_object_or_404(Task, id=task_id)
     
-    return render(request, 'projects/task_form.html', {
-        'form': form,
-        'task': task,  # Передаем задачу в шаблон
-    })
+    # Проверяем права
+    if request.user not in task.assigned_to.all():
+        return JsonResponse({'success': False, 'error': 'У вас нет прав на завершение этой задачи'})
+    
+    # Находим статус "Завершена"
+    try:
+        done_status = TaskStatus.objects.get(name='Завершена')
+        task.status = done_status
+        task.end_date = timezone.now().date()
+        task.save()
+        return JsonResponse({'success': True})
+    except TaskStatus.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Статус "Завершена" не найден'})
+
+@require_http_methods(["POST"])
+@login_required
+def reopen_task(request, task_id):
+    """Переоткрытие задачи"""
+    task = get_object_or_404(Task, id=task_id)
+    
+    # Проверяем права
+    if (request.user not in task.assigned_to.all() and 
+        request.user.role not in ['admin', 'director']):
+        return JsonResponse({'success': False, 'error': 'У вас нет прав на переоткрытие этой задачи'})
+    
+    # Находим статус "В работе" или первый доступный статус
+    try:
+        in_progress_status = TaskStatus.objects.get(name='В работе')
+        task.status = in_progress_status
+        task.end_date = None
+        task.save()
+        return JsonResponse({'success': True})
+    except TaskStatus.DoesNotExist:
+        # Используем первый доступный статус
+        available_status = task.project.get_project_statuses().first()
+        if available_status:
+            task.status = available_status
+            task.end_date = None
+            task.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Нет доступных статусов'})
 def delete_task(request, task_id):
     task = get_object_or_404(Task, id=task_id)
     project_id = task.project.id
@@ -212,53 +347,86 @@ def delete_task(request, task_id):
     
     # Для GET-запросов можно вернуть на страницу задачи
     return redirect('task_detail', task_id=task_id)
-@login_required
-@require_http_methods(["POST"])
 @csrf_exempt
-
-def update_task_status_ajax(request, task_id):
-    try:
-        task = Task.objects.get(id=task_id)
-        
-        # Проверка прав
-        has_permission = (
-            request.user in task.assigned_to.all() or
-            request.user == task.project.creator or
-            request.user.is_superuser
-        )
-        
-        if not has_permission:
-            return JsonResponse({'error': 'У вас нет прав для изменения этой задачи'}, status=403)
-        
-        data = json.loads(request.body)
-        new_status = data.get('status')
-        
-        # Проверка допустимых статусов
-        valid_statuses = ['new', 'in_progress', 'done']
-        if new_status not in valid_statuses:
-            return JsonResponse(
-                {'error': f'Недопустимый статус задачи. Допустимые: {", ".join(valid_statuses)}'}, 
-                status=400
-            )
-        
-        # Обновление только статуса (без изменения дат)
-        task.status = new_status
-        task.save()
-        
-        return JsonResponse({
-            'success': True,
-            'new_status': task.status,
-            'status_display': task.get_status_display(),
-            'start_date': task.start_date.strftime('%Y-%m-%d') if task.start_date else None,
-            'end_date': task.end_date.strftime('%Y-%m-%d') if task.end_date else None
-        })
+@require_http_methods(["POST"])
+@login_required
+def update_task_status(request, task_id):
+    """Обновление статуса задачи через drag&drop"""
+    print(f"=== UPDATE TASK STATUS CALLED ===")
+    print(f"Task ID: {task_id}")
+    print(f"User: {request.user}")
     
-    except Task.DoesNotExist:
-        return JsonResponse({'error': 'Задача не найдена'}, status=404)
+    try:
+        task = get_object_or_404(Task, id=task_id)
+        print(f"Task found: {task.title}")
+        
+        # ПРАВИЛЬНАЯ ПРОВЕРКА ПРАВ - используем assigned_to вместо assignee
+        if (request.user not in task.assigned_to.all() and 
+            request.user != task.project.creator and
+            request.user not in task.project.participants.all()):
+            print("Permission denied")
+            return JsonResponse({'error': 'Нет прав на изменение задачи'}, status=403)
+        
+        # Парсим JSON данные
+        data = json.loads(request.body)
+        new_status_id = data.get('status_id')
+        print(f"New status ID: {new_status_id}")
+        
+        if not new_status_id:
+            print("No status ID provided")
+            return JsonResponse({'error': 'Не указан статус'}, status=400)
+        
+        # Находим новый статус
+        try:
+            new_status = TaskStatus.objects.get(id=new_status_id)
+            print(f"New status found: {new_status.name}")
+        except TaskStatus.DoesNotExist:
+            print("Status not found")
+            return JsonResponse({'error': 'Статус не найден'}, status=400)
+        
+        # Проверяем, что статус доступен для этого проекта
+        project_statuses = task.project.get_project_statuses()
+        if new_status not in project_statuses:
+            print("Status not available for project")
+            return JsonResponse({'error': 'Статус недоступен для этого проекта'}, status=400)
+        
+        # Обновляем статус
+        old_status_name = task.status.name if task.status else "None"
+        task.status = new_status
+        print(f"Status changed from {old_status_name} to {new_status.name}")
+        
+        # Автоматически обновляем даты при изменении статуса
+        from django.utils import timezone
+        
+        if new_status.name == 'В работе' and not task.start_date:
+            task.start_date = timezone.now().date()
+            print("Start date set")
+        
+        if new_status.name == 'Завершена' and not task.end_date:
+            task.end_date = timezone.now().date()
+            print("End date set")
+        
+        task.save()
+        print("Task saved successfully")
+        
+        # Возвращаем обновленные данные
+        response_data = {
+            'success': True,
+            'task_id': task.id,
+            'status_name': task.status.name,
+            'start_date': task.start_date.isoformat() if task.start_date else None,
+            'end_date': task.end_date.isoformat() if task.end_date else None,
+        }
+        
+        print(f"Response: {response_data}")
+        return JsonResponse(response_data)
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+        return JsonResponse({'error': 'Неверный формат данных'}, status=400)
     except Exception as e:
+        print(f"Unexpected error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
 User = get_user_model()
 
 def employee_list(request):

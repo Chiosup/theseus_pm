@@ -34,10 +34,12 @@ class ProjectForm(forms.ModelForm):
                 'class': 'form-control',
                 'size': 5
             }),
-            'available_statuses': forms.SelectMultiple(attrs={
-                'class': 'form-control',
-                'size': 6
+            'available_statuses': forms.CheckboxSelectMultiple(attrs={
+                'class': 'status-checkboxes'
             }),
+        }
+        labels = {
+            'available_statuses': 'Статусы задач для проекта'
         }
 
     def __init__(self, *args, **kwargs):
@@ -48,10 +50,9 @@ class ProjectForm(forms.ModelForm):
         
         if not self.instance.pk:
             self.fields['version'].initial = 'v1.0'
-            # Устанавливаем статусы по умолчанию
+            # Устанавливаем все активные статусы по умолчанию
             default_statuses = TaskStatus.objects.filter(is_active=True)
             self.fields['available_statuses'].initial = default_statuses
-
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
@@ -73,8 +74,8 @@ class TaskForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         if self.project:
-            # Ограничиваем выбор статусов и предыдущих задач текущим проектом
-            self.fields['status'].queryset = self.project.get_available_statuses()
+            # Ограничиваем выбор статусов только теми, что выбраны для проекта
+            self.fields['status'].queryset = self.project.get_project_statuses()
             self.fields['previous_task'].queryset = Task.objects.filter(project=self.project)
             self.fields['parent_task'].queryset = Task.objects.filter(project=self.project)
         
