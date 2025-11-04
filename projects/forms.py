@@ -1,10 +1,11 @@
 from django import forms
-from .models import Project, Task
+from .models import Project, Task, ProjectStage, TaskStatus, TaskPriority
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['title', 'description', 'start_date', 'end_date', 'status', 'participants', 'version']
+        fields = ['title', 'description', 'start_date', 'end_date', 'stage', 'status', 
+                 'version', 'participants', 'available_statuses']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -23,43 +24,74 @@ class ProjectForm(forms.ModelForm):
                 'type': 'date',
                 'class': 'form-control'
             }),
+            'stage': forms.Select(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
+            'version': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'v1.0'
+            }),
             'participants': forms.SelectMultiple(attrs={
                 'class': 'form-control',
                 'size': 5
             }),
-          'version': forms.TextInput(attrs={  # НОВЫЙ ВИДЖЕТ
+            'available_statuses': forms.SelectMultiple(attrs={
                 'class': 'form-control',
-                'placeholder': 'v1.0'
+                'size': 6
             }),
         }
-        labels = {
-            'version': 'Версия проекта'  # Новая метка
-        }
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # Устанавливаем значение по умолчанию для нового проекта
-            if not self.instance.pk:  # Если проект новый
-                self.fields['version'].initial = 'v1.0'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Фильтруем только активные стадии и статусы
+        self.fields['stage'].queryset = ProjectStage.objects.filter(is_active=True)
+        self.fields['available_statuses'].queryset = TaskStatus.objects.filter(is_active=True)
+        
+        if not self.instance.pk:
+            self.fields['version'].initial = 'v1.0'
+            # Устанавливаем статусы по умолчанию
+            default_statuses = TaskStatus.objects.filter(is_active=True)
+            self.fields['available_statuses'].initial = default_statuses
 
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['title', 'description', 'start_date', 'end_date', 'due_date', 'status', 'priority', 'assigned_to', 'previous_task']
+        fields = ['title', 'description', 'start_date', 'end_date', 'due_date', 
+                 'status', 'priority', 'assigned_to', 'previous_task', 'parent_task']
         widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'}),
-            'due_date': forms.DateInput(attrs={'type': 'date', 'readonly': 'readonly'}),  # Запрет изменения вручную
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'priority': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'previous_task': forms.Select(attrs={'class': 'form-control'}),
+            'parent_task': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        self.project = kwargs.pop('project', None)
+        super().__init__(*args, **kwargs)
+        
+        if self.project:
+            # Ограничиваем выбор статусов и предыдущих задач текущим проектом
+            self.fields['status'].queryset = self.project.get_available_statuses()
+            self.fields['previous_task'].queryset = Task.objects.filter(project=self.project)
+            self.fields['parent_task'].queryset = Task.objects.filter(project=self.project)
+        
+        # Фильтруем только активные приоритеты
+        self.fields['priority'].queryset = TaskPriority.objects.filter(is_active=True)
 
     def clean(self):
         cleaned_data = super().clean()
-        start_date = cleaned_data.get("start_date") or now().date()
-        end_date = cleaned_data.get("end_date") or (start_date + timedelta(days=7))
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
         
-        # Устанавливаем даты по умолчанию, если их нет
-        cleaned_data["start_date"] = start_date
-        cleaned_data["end_date"] = end_date
-        cleaned_data["due_date"] = end_date  # Автоматически устанавливаем срок выполнения
-
+        if not start_date:
+            from django.utils.timezone import now
+            cleaned_data["start_date"] = now().date()
+        if not end_date:
+            from datetime import timedelta
+            cleaned_data["end_date"] = cleaned_data["start_date"] + timedelta(days=7)
+        
+        cleaned_data["due_date"] = cleaned_data["end_date"]
         return cleaned_data

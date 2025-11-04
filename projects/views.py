@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Project, Task
+from .models import Project, Task, TaskStatus, TaskPriority, ProjectStage
 from .forms import ProjectForm, TaskForm
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
@@ -263,39 +263,61 @@ User = get_user_model()
 
 def employee_list(request):
     employees = User.objects.all().order_by('last_name', 'first_name')
-    
     employee_data = []
+    
     for employee in employees:
-        # Получаем все задачи сотрудника
         tasks = Task.objects.filter(assigned_to=employee)
-        
-        # Считаем количество задач по статусам
         total_tasks = tasks.count()
-        active_tasks = tasks.filter(status='in_progress').count()
         
-        # Вычисляем процент загрузки
+        # Группируем задачи по статусам
+        status_counts = {}
+        for task in tasks:
+            status_name = task.status.name if task.status else 'Без статуса'
+            status_counts[status_name] = status_counts.get(status_name, 0) + 1
+        
+        # Определяем активные задачи (не финальные статусы)
+        active_tasks_count = 0
+        if TaskStatus.objects.filter(is_final=True).exists():
+            final_statuses = TaskStatus.objects.filter(is_final=True)
+            active_tasks_count = tasks.exclude(status__in=final_statuses).count()
+        else:
+            # Fallback: считаем все задачи кроме "Завершена" активными
+            active_tasks_count = tasks.exclude(status__name='Завершена').count()
+        
+        # Расчет прогресса
         progress = 0
         if total_tasks > 0:
-            progress = (active_tasks / total_tasks) * 100
-
+            progress = (active_tasks_count / total_tasks) * 100
+        
+        # Подсчет просроченных задач
+        overdue_tasks = tasks.filter(
+            due_date__lt=timezone.now().date()
+        ).exclude(
+            status__is_final=True
+        ).count()
+        
+        # Получаем основные статусы для отображения
+        new_count = status_counts.get('Новая', 0)
+        in_progress_count = status_counts.get('В работе', 0)
+        done_count = status_counts.get('Завершена', 0)
+        
         task_counts = {
             'total': total_tasks,
-            'new': tasks.filter(status='new').count(),
-            'in_progress': active_tasks,
-            'done': tasks.filter(status='done').count(),
-            'overdue': tasks.filter(due_date__lt=timezone.now().date(), status__in=['new', 'in_progress']).count()
+            'new': new_count,
+            'in_progress': in_progress_count,
+            'done': done_count,
+            'overdue': overdue_tasks,
+            'status_counts': status_counts,  # Все статусы для отладки
         }
         
-        # Получаем проекты сотрудника
         projects = employee.projects.all().distinct()
         
         employee_data.append({
             'employee': employee,
             'task_counts': task_counts,
             'projects': projects,
-            'progress': progress,  # Добавляем вычисленный прогресс
-            'overdue_tasks': tasks.filter(due_date__lt=timezone.now().date(), status__in=['new', 'in_progress']),
-            'all_tasks': tasks
+            'progress': progress,
+            'all_tasks': tasks,
         })
     
     return render(request, 'projects/employee_list.html', {

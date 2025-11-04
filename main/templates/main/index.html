@@ -134,13 +134,16 @@
 
 <script>
 $(document).ready(function(){
-    // Загрузка формы при открытии модалки создания проекта
+    let formSubmitted = false; // Флаг для предотвращения двойной отправки
+    
+    // Загрузка формы при открытии модалки
     $('#createProjectModal').on('show.bs.modal', function (e) {
         $.ajax({
             url: "{% url 'create_project' %}",
             type: 'GET',
             success: function(data) {
                 $('#modalBody').html(data.form_html);
+                formSubmitted = false; // Сбрасываем флаг при открытии модалки
             },
             error: function(xhr) {
                 console.error('Ошибка загрузки формы:', xhr.responseText);
@@ -148,9 +151,21 @@ $(document).ready(function(){
         });
     });
 
-    // Отправка формы создания проекта
-    $(document).on('submit', '#projectForm', function(e){
+    // Обработчик отправки формы - используем .one() для однократного выполнения
+    $(document).off('submit', '#projectForm').on('submit', '#projectForm', function(e){
         e.preventDefault();
+        
+        if (formSubmitted) {
+            console.log('Форма уже отправляется...');
+            return false;
+        }
+        
+        formSubmitted = true;
+        
+        // Блокируем кнопку отправки
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.text();
+        submitBtn.prop('disabled', true).text('Создание...');
         
         $.ajax({
             type: 'POST',
@@ -159,34 +174,43 @@ $(document).ready(function(){
             success: function(response) {
                 if (response.success) {
                     $('#createProjectModal').modal('hide');
-                    location.reload(); 
+                    // Небольшая задержка перед перезагрузкой для UX
+                    setTimeout(function() {
+                        location.reload();
+                    }, 500);
                 } else {
                     $('#modalBody').html(response.form_html);
+                    formSubmitted = false; // Разблокируем форму при ошибке
+                    submitBtn.prop('disabled', false).text(originalText);
                 }
             },
             error: function(xhr) {
                 console.error('Ошибка отправки формы:', xhr.responseText);
+                formSubmitted = false;
+                submitBtn.prop('disabled', false).text(originalText);
+                alert('Произошла ошибка при создании проекта');
             }
         });
     });
 
-    // Логика выбора проектов для копирования
+    // Сбрасываем флаг при закрытии модалки
+    $('#createProjectModal').on('hidden.bs.modal', function () {
+        formSubmitted = false;
+    });
+
+    // Логика выбора проектов для копирования (остается без изменений)
     let selectedProjectId = null;
     
     $('.project-checkbox').change(function() {
         const projectId = $(this).data('project-id');
         const isChecked = $(this).is(':checked');
         
-        // Снимаем выделение с других проектов
         $('.project-checkbox').not(this).prop('checked', false);
-        
-        // Убираем класс selected у всех карточек
         $('.project-card-container').removeClass('selected');
         
         if (isChecked) {
             selectedProjectId = projectId;
             $('#duplicateProjectBtn').show();
-            // Добавляем класс selected к выбранной карточке
             $(this).closest('.project-card-container').addClass('selected');
         } else {
             selectedProjectId = null;
@@ -222,43 +246,6 @@ $(document).ready(function(){
             error: function(xhr) {
                 console.error('Ошибка копирования:', xhr.responseText);
                 alert('Произошла ошибка при копировании проекта');
-            }
-        });
-    });
-});
-$(document).ready(function(){
-    // Загрузка формы при открытии модалки
-    $('#createProjectModal').on('show.bs.modal', function (e) {
-        $.ajax({
-            url: "{% url 'create_project' %}",
-            type: 'GET',
-            success: function(data) {
-                $('#modalBody').html(data.form_html);
-            },
-            error: function(xhr) {
-                console.error('Ошибка загрузки формы:', xhr.responseText);
-            }
-        });
-    });
-
-    // Отправка формы
-    $(document).on('submit', '#projectForm', function(e){
-        e.preventDefault();
-        
-        $.ajax({
-            type: 'POST',
-            url: "{% url 'create_project' %}",
-            data: $(this).serialize(),
-            success: function(response) {
-                if (response.success) {
-                    $('#createProjectModal').modal('hide');
-                    location.reload(); 
-                } else {
-                    $('#modalBody').html(response.form_html);
-                }
-            },
-            error: function(xhr) {
-                console.error('Ошибка отправки формы:', xhr.responseText);
             }
         });
     });

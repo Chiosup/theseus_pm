@@ -28,40 +28,40 @@
                                     {{ data.employee.get_full_name|default:data.employee.username }}
                                 </div>
                                 <div class="small text-muted">
-                                    {{ data.employee.get_role_display|default:"-" }}
+                                    {{ data.employee.get_role_display|default:data.employee.role|title }}
                                 </div>
                             </div>
                         </div>
                     </td>
 
-      <!-- Колонка нагрузки -->
-<td style="border: 1px solid #dee2e6;" class="align-middle">
-    <div class="workload-container">
-        {% if data.task_counts.total > 0 %}
-            {% with progress=data.progress %}
-            <div class="progress-thick">
-                <div class="progress-bar 
-                    {% if progress < 40 %}bg-success
-                    {% elif progress < 80 %}bg-warning
-                    {% else %}bg-danger{% endif %}" 
-                    style="width: {{ progress }}%;">
-                    <span class="progress-text">{{ progress|floatformat:"0" }}%</span>
-                </div>
-            </div>
-            <div class="workload-details mt-1 small">
-                <div>Всего задач: {{ data.task_counts.total }}</div>
-                <div>В работе: {{ data.task_counts.in_progress }}</div>
-            </div>
-            {% endwith %}
-        {% else %}
-            <div class="progress-thick">
-                <div class="progress-bar bg-secondary" style="width: 100%;">
-                    <span class="progress-text">Нет задач</span>
-                </div>
-            </div>
-        {% endif %}
-    </div>
-</td>
+                    <!-- Колонка нагрузки -->
+                    <td style="border: 1px solid #dee2e6;" class="align-middle">
+                        <div class="workload-container">
+                            {% if data.task_counts.total > 0 %}
+                                {% with progress=data.progress %}
+                                <div class="progress-thick">
+                                    <div class="progress-bar 
+                                        {% if progress < 40 %}bg-success
+                                        {% elif progress < 80 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ progress }}%;">
+                                        <span class="progress-text">{{ progress|floatformat:"0" }}%</span>
+                                    </div>
+                                </div>
+                                <div class="workload-details mt-1 small">
+                                    <div>Всего задач: {{ data.task_counts.total }}</div>
+                                    <div>Активных: {{ data.task_counts.in_progress }}</div>
+                                </div>
+                                {% endwith %}
+                            {% else %}
+                                <div class="progress-thick">
+                                    <div class="progress-bar bg-secondary" style="width: 100%;">
+                                        <span class="progress-text">Нет задач</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </td>
 
                     <!-- Колонка статусов -->
                     <td style="border: 1px solid #dee2e6;" class="align-middle">
@@ -113,7 +113,7 @@
 </div>
 
 <style>
-    /* Основные стили */
+    /* Стили остаются без изменений */
     .avatar-circle {
         width: 42px;
         height: 42px;
@@ -121,12 +121,11 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: rgb(0, 0, 0);
+        color: white;
         font-weight: bold;
         font-size: 18px;
     }
     
-    /* Таблица */
     .table-bordered {
         border: 1px solid #dee2e6;
     }
@@ -140,43 +139,41 @@
         background-color: rgba(0, 0, 0, 0.03);
     }
     
-/* Прогресс-бар */
-.progress-thick {
-    height: 24px;
-    background-color: #f0f0f0;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-}
+    .progress-thick {
+        height: 24px;
+        background-color: #f0f0f0;
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+    }
 
-.progress-bar {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: width 0.3s ease;
-}
+    .progress-bar {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: width 0.3s ease;
+    }
 
-/* Явное указание цветов */
-.progress-bar.bg-success { background-color: #28a745; }
-.progress-bar.bg-warning { background-color: #ffc107; }
-.progress-bar.bg-danger { background-color: #dc3545; }
-.progress-bar.bg-secondary { background-color: #6c757d; }
+    .progress-bar.bg-success { background-color: #28a745; }
+    .progress-bar.bg-warning { background-color: #ffc107; }
+    .progress-bar.bg-danger { background-color: #dc3545; }
+    .progress-bar.bg-secondary { background-color: #6c757d; }
 
-.progress-text {
-    color: white;
-    font-weight: bold;
-    font-size: 12px;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
-    position: relative;
-}
+    .progress-text {
+        color: white;
+        font-weight: bold;
+        font-size: 12px;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+        position: relative;
+    }
+    
     .workload-details {
         font-size: 12px;
         color: #6c757d;
         text-align: center;
     }
     
-    /* Статусы задач */
     .status-container {
         display: flex;
         flex-direction: column;
@@ -193,38 +190,41 @@
         font-size: 13px;
         color: #495057;
     }
+    
     .badge-secondary {
-    color: #fff !important;       /* Белый текст */
-    background-color: #6c757d !important; /* Серый фон */
-    border: 1px solid #5a6268 !important; /* Темная граница */
-}
-.badge-warning {
-    color: #ffffff !important;    /* Темный текст */
-    background-color: #ffc107 !important; /* Желтый фон */
-    border: 1px solid #d39e00 !important; /* Темно-желтая граница */
-}
+        color: #fff !important;
+        background-color: #6c757d !important;
+        border: 1px solid #5a6268 !important;
+    }
+    
+    .badge-warning {
+        color: #ffffff !important;
+        background-color: #ffc107 !important;
+        border: 1px solid #d39e00 !important;
+    }
 
-.badge-success {
-    color: #ffffff !important;    /* Темный текст */
-    background-color: #08a31d !important; /* Желтый фон */
-    border: 1px solid #07ff2856 !important; /* Темно-желтая граница */
-}
-.badge-pill {
-    border-radius: 50rem;
-}
+    .badge-success {
+        color: #ffffff !important;
+        background-color: #08a31d !important;
+        border: 1px solid #07ff2856 !important;
+    }
+    
+    .badge-pill {
+        border-radius: 50rem;
+    }
 
-.badge-danger {
-    color: white !important;
-    background-color: #dc3545 !important;
-    border-color: #bd2130 !important;
-}
+    .badge-danger {
+        color: white !important;
+        background-color: #dc3545 !important;
+        border-color: #bd2130 !important;
+    }
 
-.badge-info {
-    color: white !important;
-    background-color: #17a2b8 !important;
-    border-color: #117a8b !important;
-}
-    /* Просрочки */
+    .badge-info {
+        color: white !important;
+        background-color: #17a2b8 !important;
+        border-color: #117a8b !important;
+    }
+    
     .overdue-badge {
         display: flex;
         flex-direction: column;
@@ -237,7 +237,6 @@
         color: #dc3545;
     }
     
-    /* Проекты */
     .projects-container {
         display: flex;
         flex-wrap: wrap;
