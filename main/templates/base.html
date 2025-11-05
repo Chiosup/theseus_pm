@@ -14,8 +14,223 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     {% load static %}
     {% load chat_tags %}
+    
+    <style>
+        .theme-toggle-btn {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 1000;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border: none;
+            color: white;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .theme-toggle-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        body.dark-theme {
+            background-color: #1f1f1f;
+            color: #e9ecef;
+        }
+        
+        .dark-theme .navbar {
+            background-color: #2d2d2d !important;
+            border-bottom: 1px solid #444;
+        }
+        
+        .dark-theme .container {
+            background-color: transparent;
+            color: #e9ecef;
+        }
+        
+        /* Стили для карточек */
+        .dark-theme .card {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+            border-color: #444;
+        }
+        
+        .dark-theme .card-header {
+            background-color: #363636;
+            color: #e9ecef;
+            border-bottom-color: #444;
+        }
+        
+        /* Стили для таблиц */
+        .dark-theme .table {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+            border-color: #444;
+        }
+        
+        .dark-theme .table th,
+        .dark-theme .table td {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+            border-color: #444;
+        }
+        
+        .dark-theme .table-hover tbody tr:hover {
+            background-color: #363636;
+            color: #e9ecef;
+        }
+        
+        .dark-theme .table-bordered {
+            border-color: #444;
+        }
+        
+        .dark-theme .table-bordered th,
+        .dark-theme .table-bordered td {
+            border-color: #444;
+        }
+        
+        /* Стили для канбан-доски */
+        .dark-theme .kanban-column {
+            background: #2d2d2d !important;
+            border-color: #444 !important;
+        }
+        
+        .dark-theme .kanban-task {
+            background: #363636 !important;
+            color: #e9ecef !important;
+            border-left-color: #4a76a8 !important;
+        }
+        
+        .dark-theme .kanban-column-header {
+            color: #e9ecef;
+        }
+        
+        .dark-theme .task-title {
+            color: #e9ecef !important;
+        }
+        
+        .dark-theme .task-title:hover {
+            color: #66b3ff !important;
+        }
+        
+        .dark-theme .kanban-empty {
+            color: #adb5bd;
+        }
+        
+        .dark-theme .kanban-column.highlight {
+            background: #3a3a3a !important;
+            border: 2px dashed #4a76a8 !important;
+        }
+        
+        /* Стили для форм */
+        .dark-theme .form-control {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+            border-color: #444;
+        }
+        
+        .dark-theme .form-control:focus {
+            background-color: #3d3d3d;
+            color: #e9ecef;
+            border-color: #666;
+        }
+        
+        .dark-theme .form-select {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+            border-color: #444;
+        }
+        
+        /* Стили для кнопок */
+        .dark-theme .btn:not(.theme-toggle-btn) {
+            background-color: #495057;
+            color: #e9ecef;
+            border-color: #495057;
+        }
+        
+        .dark-theme .btn-outline-primary {
+            color: #66b3ff;
+            border-color: #66b3ff;
+        }
+        
+        .dark-theme .btn-outline-primary:hover {
+            background-color: #66b3ff;
+            color: #1f1f1f;
+        }
+        
+        .dark-theme .btn-success {
+            background-color: #198754;
+            border-color: #198754;
+        }
+        
+        /* Стили для текста */
+        .dark-theme .text-dark,
+        .dark-theme .text-black {
+            color: #e9ecef !important;
+        }
+        
+        .dark-theme .text-muted {
+            color: #adb5bd !important;
+        }
+        
+        /* Стили для ссылок */
+        .dark-theme a {
+            color: #66b3ff;
+        }
+        
+        .dark-theme a:hover {
+            color: #99ccff;
+        }
+        
+        /* Стили для модальных окон */
+        .dark-theme .modal-content {
+            background-color: #2d2d2d;
+            color: #e9ecef;
+        }
+        
+        .dark-theme .modal-header {
+            border-bottom-color: #444;
+        }
+        
+        .dark-theme .modal-footer {
+            border-top-color: #444;
+        }
+        
+        .dark-theme .btn-close {
+            filter: invert(1);
+        }
+        
+        /* Стили для прогресс-баров */
+        .dark-theme .progress-thick {
+            background-color: #444;
+        }
+        
+        /* Стили для баджей */
+        .dark-theme .badge.bg-secondary {
+            background-color: #6c757d !important;
+        }
+        
+        /* Стили для диаграммы Ганта */
+        .dark-theme .gantt-container {
+            background: #2d2d2d;
+            color: #e9ecef;
+        }
+    </style>
 </head>
 <body>
+    <!-- Кнопка переключения темы -->
+    <button class="theme-toggle-btn" id="themeToggle" title="Переключить тему">
+        <i class="fas fa-moon"></i>
+    </button>
+
     <nav class="navbar">
         <a href="/" class="logo">
             <img src="{% static 'img/logo.png' %}" alt="Логотип">
@@ -41,6 +256,38 @@
         {% block content %}{% endblock %}
     </div>
 
+    <script>
+        $(document).ready(function() {
+            const themeToggle = $('#themeToggle');
+            const body = $('body');
+            
+            // Проверяем сохраненную тему в localStorage
+            if (localStorage.getItem('darkTheme') === 'enabled') {
+                enableDarkTheme();
+            }
+            
+            // Обработчик клика по кнопке
+            themeToggle.click(function() {
+                if (body.hasClass('dark-theme')) {
+                    disableDarkTheme();
+                } else {
+                    enableDarkTheme();
+                }
+            });
+            
+            function enableDarkTheme() {
+                body.addClass('dark-theme');
+                themeToggle.html('<i class="fas fa-sun"></i>');
+                localStorage.setItem('darkTheme', 'enabled');
+            }
+            
+            function disableDarkTheme() {
+                body.removeClass('dark-theme');
+                themeToggle.html('<i class="fas fa-moon"></i>');
+                localStorage.setItem('darkTheme', 'disabled');
+            }
+        });
+    </script>
     
 </body>
 </html>

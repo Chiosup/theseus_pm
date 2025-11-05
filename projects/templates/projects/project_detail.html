@@ -8,6 +8,7 @@
         <div class="project-info">
             <span class="project-date">Дата начала: {{ project.start_date }}</span>
             <span class="project-date">Дата окончания: {{ project.end_date }}</span>
+            <span class="project-curator">Куратор: {{ project.creator.get_full_name }}</span>
             <span class="project-status-badge status-{{ project.status }}">
                 {{ project.get_status_display }}
             </span>
@@ -16,6 +17,7 @@
                 {{ project.stage.name }}
             </span>
             {% endif %}
+            
         </div>
     </div>
     
@@ -249,6 +251,16 @@
 
 .project-stage-badge {
     color: white;
+}
+
+.project-curator {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 4px 8px;
+    background: #f1f3f5;
+    color: #333;
+    border-radius: 4px;
+    font-size: 0.9em;
 }
 </style>
 

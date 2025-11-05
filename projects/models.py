@@ -73,7 +73,22 @@ class Project(models.Model):
     
     # Статусы, которые используются в этом проекте
     available_statuses = models.ManyToManyField(TaskStatus, blank=True, verbose_name="Доступные статусы")
+    def get_completion_percentage(self):
+        """Рассчитать процент выполнения проекта на основе задач"""
+        total_tasks = self.tasks.count()
+        if total_tasks == 0:
+            return 0
+        
+        completed_tasks = self.tasks.filter(
+            status__is_final=True
+        ).count()
+        
+        return round((completed_tasks / total_tasks) * 100)
     
+    @property
+    def completion_percentage(self):
+        """Свойство для удобного доступа к проценту выполнения"""
+        return self.get_completion_percentage()
     def get_project_statuses(self):
         """Получить статусы, выбранные для этого проекта"""
         if self.available_statuses.exists():
@@ -82,13 +97,7 @@ class Project(models.Model):
             # Возвращаем все активные статусы по умолчанию
             return TaskStatus.objects.filter(is_active=True).order_by('order')
     
-    def get_default_status(self):
-        """Получить статус по умолчанию для проекта"""
-        statuses = self.get_project_statuses()
-        default_status = statuses.filter(is_default=True).first()
-        if not default_status:
-            default_status = statuses.first()
-        return default_status
+
     
     def __str__(self):
         return f"{self.title} ({self.version})"

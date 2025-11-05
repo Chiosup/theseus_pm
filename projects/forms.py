@@ -1,11 +1,15 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.utils.html import format_html
 from .models import Project, Task, ProjectStage, TaskStatus, TaskPriority, SubTask
+
+User = get_user_model()
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
         fields = ['title', 'description', 'start_date', 'end_date', 'stage', 'status', 
-                 'version', 'participants', 'available_statuses']
+                 'version', 'creator', 'participants', 'available_statuses']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -30,9 +34,9 @@ class ProjectForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'v1.0'
             }),
-            'participants': forms.SelectMultiple(attrs={
-                'class': 'form-control',
-                'size': 5
+            'creator': forms.Select(attrs={'class': 'form-control'}),
+            'participants': forms.CheckboxSelectMultiple(attrs={
+                'class': 'participant-checkboxes'
             }),
             'available_statuses': forms.CheckboxSelectMultiple(attrs={
                 'class': 'status-checkboxes'
@@ -47,7 +51,18 @@ class ProjectForm(forms.ModelForm):
         # Фильтруем только активные стадии и статусы
         self.fields['stage'].queryset = ProjectStage.objects.filter(is_active=True)
         self.fields['available_statuses'].queryset = TaskStatus.objects.filter(is_active=True)
-        
+        # Встраиваем цветовые индикаторы в подписи чекбоксов (без JS)
+        status_choices = []
+        for s in self.fields['available_statuses'].queryset:
+            color = s.color or '#999'
+            label = format_html('<span class="status-color-indicator" style="background:{}"></span> {}', color, s.name)
+            status_choices.append((s.pk, label))
+        self.fields['available_statuses'].choices = status_choices
+        # Куратор (creator) — список активных пользователей
+        self.fields['creator'].queryset = User.objects.filter(is_active=True)
+        # Участники — список активных пользователей
+        self.fields['participants'].queryset = User.objects.filter(is_active=True)
+
         if not self.instance.pk:
             self.fields['version'].initial = 'v1.0'
             # Устанавливаем все активные статусы по умолчанию
@@ -87,7 +102,7 @@ class TaskForm(forms.ModelForm):
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
             'priority': forms.Select(attrs={'class': 'form-control'}),
-            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'assigned_to': forms.CheckboxSelectMultiple(attrs={'class': 'participant-checkboxes'}),
             'previous_task': forms.Select(attrs={'class': 'form-control'}),
             'parent_task': forms.Select(attrs={'class': 'form-control'}),
         }
@@ -100,6 +115,10 @@ class TaskForm(forms.ModelForm):
             self.fields['status'].queryset = self.project.get_project_statuses()
             self.fields['previous_task'].queryset = Task.objects.filter(project=self.project)
             self.fields['parent_task'].queryset = Task.objects.filter(project=self.project)
+            # Назначаем возможных исполнителей из участников проекта
+            self.fields['assigned_to'].queryset = self.project.participants.all()
+        else:
+            self.fields['assigned_to'].queryset = User.objects.filter(is_active=True)
         
         self.fields['priority'].queryset = TaskPriority.objects.filter(is_active=True)
         
@@ -107,6 +126,15 @@ class TaskForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.fields['use_kanban_for_subtasks'].initial = self.instance.has_kanban
             self.fields['subtask_statuses'].initial = self.instance.subtask_statuses.all()
+        # Встраиваем цветовые индикаторы в подписи чекбоксов для подзадач (без JS)
+        if 'subtask_statuses' in self.fields:
+            sts = self.fields['subtask_statuses'].queryset
+            sts_choices = []
+            for s in sts:
+                color = s.color or '#999'
+                label = format_html('<span class="status-color-indicator" style="background:{}"></span> {}', color, s.name)
+                sts_choices.append((s.pk, label))
+            self.fields['subtask_statuses'].choices = sts_choices
 
     def save(self, commit=True):
         task = super().save(commit=False)
@@ -156,7 +184,7 @@ class SubTaskForm(forms.ModelForm):
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
             'priority': forms.Select(attrs={'class': 'form-control'}),
-            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'assigned_to': forms.CheckboxSelectMultiple(attrs={'class': 'participant-checkboxes'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -168,3 +196,8 @@ class SubTaskForm(forms.ModelForm):
             self.fields['status'].queryset = self.parent_task.get_available_statuses()
         
         self.fields['priority'].queryset = TaskPriority.objects.filter(is_active=True)
+        # Исполнители для подзадачи: участники проекта родительской задачи, если доступны
+        if self.parent_task and hasattr(self.parent_task, 'project'):
+            self.fields['assigned_to'].queryset = self.parent_task.project.participants.all()
+        else:
+            self.fields['assigned_to'].queryset = User.objects.filter(is_active=True)

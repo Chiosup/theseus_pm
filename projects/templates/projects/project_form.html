@@ -83,9 +83,19 @@
     
     <div class="form-group">
         <label for="{{ form.participants.id_for_label }}">Участники:</label>
-        {{ form.participants }}
+        <div class="participant-checkboxes-container">
+            {{ form.participants }}
+        </div>
         {% if form.participants.errors %}
             <div class="error">{{ form.participants.errors }}</div>
+        {% endif %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.creator.id_for_label }}">Куратор (назначить):</label>
+        {{ form.creator }}
+        {% if form.creator.errors %}
+            <div class="error">{{ form.creator.errors }}</div>
         {% endif %}
     </div>
     
@@ -156,6 +166,20 @@
     background: #f8f9fa;
 }
 
+/* Dark theme support */
+.dark-theme .status-checkboxes-container {
+    background: #30343a;
+    border-color: #444;
+}
+.dark-theme .participant-checkboxes-container {
+    background: #2b2d31;
+    border: 1px solid #444;
+}
+.dark-theme .status-checkboxes label,
+.dark-theme .participant-checkboxes label {
+    color: #ddd;
+}
+
 .status-checkboxes {
     list-style: none;
     padding: 0;
@@ -206,28 +230,4 @@
     }
 }
 </style>
-
-<script>
-// Добавляем цветовые индикаторы к статусам
-document.addEventListener('DOMContentLoaded', function() {
-    const statusCheckboxes = document.querySelectorAll('.status-checkboxes input[type="checkbox"]');
-    
-    statusCheckboxes.forEach(checkbox => {
-        const label = checkbox.parentElement;
-        const statusId = checkbox.value;
-        
-        // Получаем цвет статуса из данных (можно добавить data-атрибуты)
-        // Пока используем случайные цвета для демонстрации
-        const colors = ['#4a76a8', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14'];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        
-        // Создаем цветовой индикатор
-        const colorIndicator = document.createElement('span');
-        colorIndicator.className = 'status-color-indicator';
-        colorIndicator.style.backgroundColor = randomColor;
-        
-        // Вставляем индикатор перед текстом
-        label.insertBefore(colorIndicator, label.querySelector('span').firstChild);
-    });
-});
-</script>
+<!-- Цветовые индикаторы теперь встроены в подписи чекбоксов (через форму) -->

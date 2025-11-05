@@ -55,7 +55,9 @@
     
     <div class="mb-3">
         <label for="{{ form.assigned_to.id_for_label }}" class="form-label">Исполнители</label>
-        {{ form.assigned_to }}
+        <div class="participant-checkboxes-container">
+            {{ form.assigned_to }}
+        </div>
     </div>
     
     {% if form.previous_task %}
@@ -125,6 +127,7 @@ $(document).ready(function(){
     // Стили для чекбоксов статусов
     $('.status-checkboxes-container').addClass('border p-3 rounded bg-light');
     $('.status-checkboxes label').addClass('d-block mb-2');
+    $('.participant-checkboxes-container').addClass('border p-3 rounded bg-light');
 });
 </script>
 
@@ -136,5 +139,25 @@ $(document).ready(function(){
 .form-check-input:checked {
     background-color: #4a76a8;
     border-color: #4a76a8;
+}
+
+/* Цветовой индикатор для статусов */
+.status-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* Dark theme support */
+.dark-theme .status-checkboxes-container,
+.dark-theme .participant-checkboxes-container {
+    background: #2b2d31;
+    border-color: #444;
+}
+.dark-theme .status-checkboxes label,
+.dark-theme .participant-checkboxes label {
+    color: #ddd;
 }
 </style>

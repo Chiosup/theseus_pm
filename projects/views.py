@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Project, Task, TaskStatus, TaskPriority, ProjectStage, SubTask
 from .forms import ProjectForm, TaskForm, SubTaskForm
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseForbidden
@@ -32,17 +33,67 @@ def edit_project(request, project_id):
 def project_list(request):
     """Отображение списка проектов, в которых участвует пользователь или которые он создал."""
     if request.user.is_superuser:
-        projects = Project.objects.all()  # Админ видит все проекты
+        projects = Project.objects.all()
     elif request.user.groups.filter(name="Менеджеры").exists():
-        projects = Project.objects.filter(creator=request.user)  # Менеджеры видят свои проекты
+        projects = Project.objects.filter(creator=request.user)
     else:
-        projects = Project.objects.filter(participants=request.user)  # Остальные видят, где участвуют
+        projects = Project.objects.filter(participants=request.user)
 
-   
+    # Рассчитываем статистику для диаграмм
+    total_projects = projects.count()
+    
+    # Статистика по стадиям проекта — группируем по Project.stage
+    project_status_data = []
+    stage_counts = projects.values('stage__id', 'stage__name', 'stage__color')\
+                          .annotate(count=Count('id'))\
+                          .order_by('-count')
+
+    for sc in stage_counts:
+        name = sc.get('stage__name') or 'Без стадии'
+        color = sc.get('stage__color') or '#6c757d'
+        project_status_data.append({
+            'name': name,
+            'count': sc.get('count', 0),
+            'color': color,
+        })
+
+    # Общая статистика по задачам - ИСПРАВЛЕНО
+    total_tasks = 0
+    completed_tasks = 0
+    
     for project in projects:
-        project.completed_tasks_count = project.tasks.filter(status="completed").count()
+        project_tasks = project.tasks.all()
+        total_project_tasks = project_tasks.count()
+        total_tasks += total_project_tasks
+        
+        # Считаем завершенные задачи (статус is_final=True)
+        project_completed_tasks = project_tasks.filter(
+            status__is_final=True
+        ).count()
+        completed_tasks += project_completed_tasks
+        
+        # Процент выполнения для каждого проекта
+        project_completion = 0
+        if total_project_tasks > 0:
+            project_completion = round((project_completed_tasks / total_project_tasks) * 100)
+        # Сохраняем в объект проекта для использования в шаблоне
+        project.calculated_completion = project_completion
 
-    return render(request, "projects/project_list.html", {"projects": projects})
+    # Общий процент выполнения
+    overall_completion = 0
+    if total_tasks > 0:
+        overall_completion = round((completed_tasks / total_tasks) * 100)
+
+    context = {
+        'projects': projects,
+        'total_projects': total_projects,
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
+        'overall_completion': overall_completion,
+        'project_status_data': project_status_data,
+    }
+    
+    return render(request, "main/index.html", context)
 @csrf_exempt
 @require_http_methods(["POST"])
 @login_required
@@ -137,7 +188,12 @@ def create_project(request):
         form = ProjectForm(request.POST)
         if form.is_valid():
             project = form.save(commit=False)
-            project.creator = request.user
+            # Разрешаем назначать куратора из формы только пользователям с правами
+            requested_creator = form.cleaned_data.get('creator')
+            if requested_creator and (request.user.is_superuser or request.user.role in ['admin', 'director']):
+                project.creator = requested_creator
+            else:
+                project.creator = request.user
             project.save()
             form.save_m2m()  
             
@@ -161,7 +217,7 @@ def create_project(request):
 def create_task_modal(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
     if request.method == 'POST':
-        form = TaskForm(request.POST)
+        form = TaskForm(request.POST, project=project)
         if form.is_valid():
             task = form.save(commit=False)
             task.project = project
@@ -172,7 +228,7 @@ def create_task_modal(request, project_id):
             html = render(request, 'projects/partials/task_form.html', {'form': form, 'project': project}).content.decode('utf-8')
             return JsonResponse({'success': False, 'form_html': html})
     else:
-        form = TaskForm()
+        form = TaskForm(project=project)
         html = render(request, 'projects/partials/task_form.html', {'form': form, 'project': project}).content.decode('utf-8')
         return JsonResponse({'form_html': html})
 
@@ -302,7 +358,7 @@ def create_task(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     
     if request.method == 'POST':
-        form = TaskForm(request.POST)
+        form = TaskForm(request.POST, project=project)
         if form.is_valid():
             task = form.save(commit=False)
             task.project = project
@@ -310,7 +366,7 @@ def create_task(request, project_id):
             form.save_m2m() 
             return redirect('task_detail', task_id=task.id)  
     else:
-        form = TaskForm()
+        form = TaskForm(project=project)
     
     return render(request, 'projects/task_form.html', {
         'form': form,
