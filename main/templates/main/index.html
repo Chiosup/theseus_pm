@@ -13,7 +13,7 @@
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
-                        <div id="statusPieChart" style="height: 200px;">
+                        <div id="statusPieChart" class="chart-area">
                             {% if project_status_data %}
                                 <!-- Диаграмма загрузится через JavaScript -->
                             {% else %}
@@ -88,7 +88,7 @@
     <button type="button" class="btn btn-custom" data-bs-toggle="modal" data-bs-target="#createProjectModal">
         <i class="fas fa-plus"></i> Добавить проект
     </button>
-    <button type="button" class="btn btn-outline-custom" id="duplicateProjectBtn" style="display: none;">
+    <button type="button" class="btn btn-outline-custom" id="duplicateProjectBtn">
         <i class="fas fa-copy"></i> Создать копию
     </button>
 </div>
@@ -158,9 +158,9 @@
             <h5><i class="fas fa-chart-bar"></i> Диаграмма Ганта - Сроки проектов</h5>
         </div>
         <div class="card-body">
-            <div id="ganttChart" style="height: 300px;">
+            <div id="ganttChart" class="chart-area">
                 {% if projects %}
-                    <!-- Диаграмма загрузится через JavaScript -->
+                    <!-- Диаграмма через JavaScript -->
                 {% else %}
                     <div class="text-center text-muted py-5">
                         <i class="fas fa-chart-bar fa-3x mb-3"></i>
@@ -344,8 +344,141 @@ $(document).ready(function(){
     {% if project_status_data %}initStatusPieChart();{% endif %}
     {% if projects %}initGanttChart();{% endif %}
     
-    // Остальной JavaScript код остается без изменений
-    // ... (код для модальных окон и копирования проектов)
+    // Загрузка формы создания проекта в модальное окно при его открытии
+    $('#createProjectModal').on('show.bs.modal', function (e) {
+        const $modalBody = $('#modalBody');
+        $modalBody.html('<div class="text-center py-4">Загрузка...</div>');
+
+        $.get('/projects/create/')
+            .done(function(resp) {
+                if (resp.form_html) {
+                    $modalBody.html(resp.form_html);
+                } else {
+                    $modalBody.html('<div class="text-danger">Не удалось загрузить форму</div>');
+                }
+            })
+            .fail(function() {
+                $modalBody.html('<div class="text-danger">Ошибка при загрузке формы</div>');
+            });
+    });
+
+    // Обработчик отправки формы создания проекта (динамически загружаемой)
+    $(document).on('submit', '#projectForm', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const $submit = $form.find('button[type="submit"]');
+        const csrftoken = getCookie('csrftoken');
+
+        $submit.prop('disabled', true).text('Сохранение...');
+
+        $.ajax({
+            url: '/projects/create/',
+            type: 'POST',
+            data: $form.serialize(),
+            headers: { 'X-CSRFToken': csrftoken },
+            success: function(resp) {
+                if (resp.success) {
+                    // Закрываем модал и перезагружаем страницу, чтобы показать новый проект
+                    var modalEl = document.getElementById('createProjectModal');
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    // Небольшая задержка чтобы анимация скрытия успела выполниться
+                    setTimeout(function() { location.reload(); }, 200);
+                } else if (resp.form_html) {
+                    // Если форма вернулась с ошибками — перерисуем её
+                    $('#modalBody').html(resp.form_html);
+                } else {
+                    $('#modalBody').html('<div class="text-danger">Ошибка при сохранении проекта</div>');
+                }
+            },
+            error: function() {
+                $('#modalBody').html('<div class="text-danger">Ошибка при сохранении проекта</div>');
+            },
+            complete: function() {
+                $submit.prop('disabled', false).text('Сохранить');
+            }
+        });
+    });
+    // Показ/скрытие кнопки "Создать копию" при выборе проектов
+    function updateDuplicateButtonVisibility() {
+        const anyChecked = $('.project-checkbox:checked').length > 0;
+        if (anyChecked) {
+            $('#duplicateProjectBtn').show();
+        } else {
+            $('#duplicateProjectBtn').hide();
+        }
+    }
+
+    // Обработчик изменения чекбоксов проектов
+    $(document).on('change', '.project-checkbox', function() {
+        updateDuplicateButtonVisibility();
+    });
+
+    // Инициализация видимости при загрузке
+    updateDuplicateButtonVisibility();
+
+    // Вспомогательная функция: получаем CSRF-токен из cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Клик по кнопке Создать копию — дублируем выбранные проекты
+    $('#duplicateProjectBtn').on('click', function() {
+        const selected = $('.project-checkbox:checked').map(function() { return $(this).data('project-id'); }).get();
+        if (selected.length === 0) {
+            alert('Выберите хотя бы один проект для копирования.');
+            return;
+        }
+
+        if (!confirm('Вы уверены, что хотите создать копии выбранных проектов?')) {
+            return;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+        const $btn = $(this);
+        $btn.prop('disabled', true).text('Копирование...');
+
+        let completed = 0;
+        const errors = [];
+
+        selected.forEach(function(projectId) {
+            $.ajax({
+                url: '/projects/' + projectId + '/duplicate/',
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+                success: function(resp) {
+                    completed += 1;
+                },
+                error: function(xhr) {
+                    completed += 1;
+                    errors.push(xhr.responseText || 'Ошибка');
+                },
+                complete: function() {
+                    // Когда все запросы завершены — перезагрузим страницу и покажем результат
+                    if (completed === selected.length) {
+                        $btn.prop('disabled', false).text('Создать копию');
+                        if (errors.length > 0) {
+                            alert('Некоторые копии не были созданы:\n' + errors.join('\n'));
+                        }
+                        // Перезагрузим страницу, чтобы показать новые проекты
+                        location.reload();
+                    }
+                }
+            });
+        });
+    });
 });
 </script>
 
@@ -383,6 +516,47 @@ $(document).ready(function(){
     display: flex;
     align-items: center;
     gap: 20px;
+}
+
+/* Ensure dashboard cards in the same row match height and their content can stretch */
+.dashboard-section .row {
+    align-items: stretch; /* make columns same height */
+}
+
+.dashboard-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.dashboard-card .card-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chart area fills available vertical space so both cards' contents align */
+.chart-container {
+    align-items: stretch;
+}
+
+.chart-area {
+    width: 100%;
+    height: 100%;
+    min-height: 220px;
+}
+
+/* Ensure progress block also stretches and its inner layout centers vertically */
+.progress-overall {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+}
+
+@media (max-width: 768px) {
+    .chart-area { min-height: 200px; }
+    .progress-overall { flex-direction: column; gap: 16px; }
 }
 
 .chart-legend {
@@ -607,6 +781,7 @@ $(document).ready(function(){
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 24px;
     margin-top: 20px;
+    margin-bottom: 32px; /* Отступ между списком проектов и следующими блоками (например, диаграммой Ганта) */
 }
 
 .project-card-container {

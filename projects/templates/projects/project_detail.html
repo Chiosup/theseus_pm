@@ -104,7 +104,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="editProjectModalBody">
-                <!-- Форма будет загружена через AJAX -->
+                
             </div>
         </div>
     </div>
@@ -118,7 +118,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="modalTaskBody">
-                <!-- Форма будет загружена через AJAX -->
+                
             </div>
         </div>
     </div>
@@ -228,9 +228,10 @@
 
 .project-info {
     display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
+    flex-direction: column; /* stack items vertically */
+    gap: 8px;
     margin-top: 10px;
+    align-items: flex-start;
 }
 
 .project-date, .project-status-badge, .project-stage-badge {

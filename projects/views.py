@@ -650,13 +650,15 @@ def duplicate_project(request, project_id):
         task_mapping = {}  # Для отслеживания связи между оригинальными и скопированными задачами
         
         for original_task in original_project.tasks.all():
+            # Сохраняем статус как объект TaskStatus (используем статус оригинала или статус по умолчанию проекта)
+            default_status = original_task.status or duplicated_project.get_default_status()
             duplicated_task = Task.objects.create(
                 title=original_task.title,
                 description=original_task.description,
                 due_date=original_task.due_date,
                 start_date=original_task.start_date,
                 end_date=original_task.end_date,
-                status='new',  # Все скопированные задачи становятся новыми
+                status=default_status,  # TaskStatus instance
                 priority=original_task.priority,
                 project=duplicated_project
             )
