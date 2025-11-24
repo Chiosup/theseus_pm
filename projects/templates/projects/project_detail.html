@@ -9,9 +9,11 @@
             <span class="project-date">Дата начала: {{ project.start_date }}</span>
             <span class="project-date">Дата окончания: {{ project.end_date }}</span>
             <span class="project-curator">Куратор: {{ project.creator.get_full_name }}</span>
+             {% if user.role in "admin director manager" %}
             <span class="project-status-badge status-{{ project.status }}">
                 {{ project.get_status_display }}
             </span>
+              {% endif %}
             {% if project.stage %}
             <span class="project-stage-badge" style="background-color: {{ project.stage.color }};">
                 {{ project.stage.name }}

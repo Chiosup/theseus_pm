@@ -27,7 +27,9 @@
     {{ form.priority }}
 
     <label for="id_assigned_to">Исполнители:</label>
-    {{ form.assigned_to }}
+    <div class="participant-checkboxes-container">
+        {{ form.assigned_to }}
+    </div>
 
     <label for="id_previous_task">Предыдущая задача:</label>
     {{ form.previous_task }}
@@ -44,4 +46,31 @@
         document.getElementById("id_due_date").value = this.value;
     });
 </script>
+<style>
+/* Participant checkboxes: compact and right-aligned (matches project form) */
+.participant-checkboxes-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f8f9fa;
+}
+.participant-checkboxes {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.participant-checkboxes li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+.participant-checkboxes input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
+.participant-checkboxes label { display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; }
+.participant-checkboxes li > label { flex:1 1 auto; }
+.participant-checkboxes li > input[type="checkbox"] { order:2; margin-left:8px; margin-right:0; flex:0 0 auto; width:auto; transform:scale(1.15); }
+.participant-checkboxes li label input[type="checkbox"] { order:2; margin-left:auto; margin-right:0; flex:0 0 auto; width:auto; transform:scale(1.15); }
+.participant-checkboxes input[type="checkbox"] { max-width:32px; }
+</style>
 {% endblock %}
